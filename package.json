@@ -13,12 +13,6 @@
     "start": "next start",
     "test-sdk": "node -e \"try { const sdk = require('@holdstation/worldchain-sdk'); console.log('✅ SDK OK:', Object.keys(sdk)); } catch(e) { console.log('⚠️ Mock mode:', e.message); }\""
   },
-  "resolutions": {
-    "bignumber.js": "^9.3.0"
-  },
-  "overrides": {
-    "bignumber.js": "^9.3.0"
-  },
   "dependencies": {
     "@holdstation/worldchain-sdk": "latest",
     "@radix-ui/react-dialog": "latest",
