@@ -29,6 +29,7 @@ import Sidebar from "@/components/sidebar"
 import TokenBalanceCard from "@/components/token-balance-card"
 import { useWorldChain } from "@/components/worldchain-provider"
 import WorldChainStatus from "@/components/worldchain-status"
+import SDKTest from "@/components/sdk-test"
 
 export default function TPulseFiWallet() {
   const [activeTab, setActiveTab] = useState("wallet")
@@ -39,7 +40,7 @@ export default function TPulseFiWallet() {
   const [logoutModalOpen, setLogoutModalOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [scanLines, setScanLines] = useState(0)
-  const { tokenBalances, isLoadingBalances, refreshBalances, isConnected } = useWorldChain()
+  const { tokenBalances, isLoadingBalances, refreshBalances, connectionStatus } = useWorldChain()
 
   const balance = 15420.75
   const usdValue = 23156.89
@@ -156,6 +157,9 @@ export default function TPulseFiWallet() {
         {/* WorldChain Status */}
         <WorldChainStatus />
 
+        {/* SDK Test - Mostra apenas se não estiver totalmente conectado */}
+        {connectionStatus !== "connected" && <SDKTest />}
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-6 bg-gray-900/60 border border-gray-800 backdrop-blur-sm shadow-2xl shadow-purple-500/10">
             <TabsTrigger
@@ -200,7 +204,7 @@ export default function TPulseFiWallet() {
                   <div className="text-2xl font-bold bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent animate-pulse">
                     {showBalance ? `${balance.toLocaleString()}` : "••••••••"}
                   </div>
-                  <div className="text-xs text-cyan-400 font-medium animate-pulse">TPULSE</div>
+                  <div className="text-xs text-cyan-400 font-medium animate-pulse">TPF</div>
                   <div className="text-gray-400 text-sm">
                     {showBalance ? `≈ $${usdValue.toLocaleString()}` : "≈ $••••••"}
                   </div>
@@ -244,9 +248,9 @@ export default function TPulseFiWallet() {
             <div className="grid grid-cols-2 gap-3">
               <Card className="bg-gray-900/70 border-2 border-purple-500/30 backdrop-blur-sm hover:border-purple-500/50 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-purple-500/25">
                 <CardContent className="p-3">
-                  <div className="text-xs text-gray-400 mb-1">Preço</div>
+                  <div className="text-xs text-gray-400 mb-1">Preço TPF</div>
                   <div className="text-lg font-bold text-purple-400 animate-pulse">$1.502</div>
-                  <div className="text-xs text-green-400 animate-bounce">+5.2%</div>
+                  <div className="text-xs text-green-400 animate-bounce">+12.5%</div>
                 </CardContent>
               </Card>
               <Card className="bg-gray-900/70 border-2 border-cyan-500/30 backdrop-blur-sm hover:border-cyan-500/50 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-cyan-500/25">
