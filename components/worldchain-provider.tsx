@@ -1,35 +1,34 @@
 "use client"
 
+/* 🔗 2. IMPORTA QUALQUER COISA **DEPOIS** do alias já ter sido aplicado.
+       Não precisamos carregar manualmente um shim; o alias garante que
+       `import { BigNumber } from "bignumber.js"` funcione em todo lugar   */
+
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
 
-// Importação condicional para evitar erros de SSR
 let ethers: any = null
 let TokenProvider: any = null
-let sdkLoadAttempted = false
+let sdkLoaded = false
 
-// Função para carregar dependências dinamicamente
-const loadDependencies = async () => {
-  if (sdkLoadAttempted) return { ethers, TokenProvider }
-
-  sdkLoadAttempted = true
-
+// -----------------------------------------------------------------------------
+// 1. Carrega dependências com FALBACK SEGURO
+// -----------------------------------------------------------------------------
+async function loadDeps() {
+  if (sdkLoaded) return
   try {
-    // Carrega ethers
-    console.log("📦 Carregando ethers...")
-    const ethersModule = await import("ethers")
-    ethers = ethersModule
-    console.log("✅ Ethers carregado")
+    // a) ethers
+    const ethersMod = await import("ethers")
+    ethers = ethersMod.ethers ?? ethersMod
 
-    // Carrega WorldChain SDK
-    console.log("📦 Carregando WorldChain SDK...")
-    const sdkModule = await import("@holdstation/worldchain-sdk")
-    TokenProvider = sdkModule.TokenProvider || sdkModule.default?.TokenProvider
+    // b) WorldChain SDK — pode falhar por causa do BigNumber
+    const sdk = await import("@holdstation/worldchain-sdk")
+    TokenProvider = sdk.TokenProvider || sdk.default?.TokenProvider
+    sdkLoaded = true
     console.log("✅ WorldChain SDK carregado")
-
-    return { ethers, TokenProvider }
-  } catch (error) {
-    console.error("❌ Erro ao carregar dependências:", error.message)
-    return { ethers: null, TokenProvider: null }
+  } catch (err) {
+    sdkLoaded = false
+    TokenProvider = null
+    console.warn("⚠️ Não foi possível carregar o SDK real; ativando modo Mock.\nDetalhe:", (err as Error).message)
   }
 }
 
@@ -71,7 +70,6 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
   const [tokenBalances, setTokenBalances] = useState<Record<string, string>>({})
   const [isLoadingBalances, setIsLoadingBalances] = useState(false)
-  const [sdkLoaded, setSdkLoaded] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState<"loading" | "connected" | "mock" | "error">("loading")
   const [dependencyStatus, setDependencyStatus] = useState({
     ethers: false,
@@ -97,16 +95,30 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
       console.log("🚀 Inicializando TPulseFi Wallet...")
 
       // Carrega dependências
-      const { ethers: ethersLib, TokenProvider: TokenProviderClass } = await loadDependencies()
+      await loadDeps()
+
+      // Se o SDK REAL não carregou, continuamos em modo Mock sem lançar exceção
+      if (!TokenProvider) {
+        setDependencyStatus({ ethers: !!ethers, sdk: false, tokenProvider: false })
+        console.log("🚧 Executando com dados simulados do TPulseFi")
+        setConnectionStatus("mock")
+        setMockData()
+        return
+      }
+
+      // Declare setSdkLoaded variable
+      const setSdkLoaded = (loaded: boolean) => {
+        sdkLoaded = loaded
+      }
 
       // Atualiza status das dependências
       setDependencyStatus({
-        ethers: !!ethersLib,
-        sdk: !!TokenProviderClass,
-        tokenProvider: !!TokenProviderClass,
+        ethers: !!ethers,
+        sdk: !!TokenProvider,
+        tokenProvider: !!TokenProvider,
       })
 
-      if (!ethersLib || !TokenProviderClass) {
+      if (!ethers || !TokenProvider) {
         console.log("⚠️ Dependências não disponíveis, usando modo mock...")
         setConnectionStatus("mock")
         setSdkLoaded(false)
@@ -119,7 +131,7 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
       // Tenta conectar ao WorldChain
       try {
         console.log("🌐 Conectando ao WorldChain...")
-        const provider = new ethersLib.providers.JsonRpcProvider("https://worldchain-mainnet.g.alchemy.com/public")
+        const provider = new ethers.providers.JsonRpcProvider("https://worldchain-mainnet.g.alchemy.com/public")
 
         // Testa conexão com timeout
         const networkPromise = provider.getNetwork()
@@ -130,7 +142,7 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
         const network = await Promise.race([networkPromise, timeoutPromise])
         console.log("✅ Conectado ao WorldChain:", network)
 
-        const tokenProviderInstance = new TokenProviderClass({ provider })
+        const tokenProviderInstance = new TokenProvider({ provider })
         setTokenProvider(tokenProviderInstance)
         setIsConnected(true)
         setConnectionStatus("connected")

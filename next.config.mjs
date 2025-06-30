@@ -35,6 +35,7 @@ const nextConfig = {
     config.resolve.alias = {
       ...config.resolve.alias,
       'async-mutex': require.resolve('async-mutex'),
+      "bignumber.js$": path.resolve(__dirname, "lib/bignumber-patched.ts"),
     }
 
     return config
