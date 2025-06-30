@@ -26,6 +26,9 @@ import ReceiveModal from "@/components/receive-modal"
 import SwapModal from "@/components/swap-modal"
 import LogoutModal from "@/components/logout-modal"
 import Sidebar from "@/components/sidebar"
+import TokenBalanceCard from "@/components/token-balance-card"
+import { useWorldChain } from "@/components/worldchain-provider"
+import WorldChainStatus from "@/components/worldchain-status"
 
 export default function TPulseFiWallet() {
   const [activeTab, setActiveTab] = useState("wallet")
@@ -36,6 +39,7 @@ export default function TPulseFiWallet() {
   const [logoutModalOpen, setLogoutModalOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [scanLines, setScanLines] = useState(0)
+  const { tokenBalances, isLoadingBalances, refreshBalances, isConnected } = useWorldChain()
 
   const balance = 15420.75
   const usdValue = 23156.89
@@ -149,6 +153,9 @@ export default function TPulseFiWallet() {
           </div>
         </div>
 
+        {/* WorldChain Status */}
+        <WorldChainStatus />
+
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-6 bg-gray-900/60 border border-gray-800 backdrop-blur-sm shadow-2xl shadow-purple-500/10">
             <TabsTrigger
@@ -250,6 +257,9 @@ export default function TPulseFiWallet() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* WorldChain Token Balances */}
+            <TokenBalanceCard tokenBalances={tokenBalances} isLoading={isLoadingBalances} onRefresh={refreshBalances} />
 
             {/* Enhanced Recent Transactions */}
             <Card className="bg-gray-900/70 border-2 border-gray-700/60 backdrop-blur-sm hover:border-gray-600/80 transition-all duration-300 hover:shadow-lg hover:shadow-gray-500/10">
