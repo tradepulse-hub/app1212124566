@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { RefreshCw, Wallet, ExternalLink, TrendingUp, Zap } from "lucide-react"
+import { RefreshCw, Wallet, ExternalLink, Zap, AlertTriangle } from "lucide-react"
 import { formatUnits } from "ethers"
 
 interface TokenBalanceCardProps {
@@ -20,8 +20,6 @@ const TOKEN_INFO = {
     color: "text-cyan-400",
     bgColor: "bg-cyan-500/20",
     borderColor: "border-cyan-500/30",
-    price: 1.502,
-    change: "+12.5%",
     isMainToken: true,
   },
   "0x4200000000000000000000000000000000000006": {
@@ -31,8 +29,6 @@ const TOKEN_INFO = {
     color: "text-blue-400",
     bgColor: "bg-blue-500/20",
     borderColor: "border-blue-500/30",
-    price: 3420.5,
-    change: "+2.4%",
     isMainToken: false,
   },
   "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1": {
@@ -42,8 +38,6 @@ const TOKEN_INFO = {
     color: "text-green-400",
     bgColor: "bg-green-500/20",
     borderColor: "border-green-500/30",
-    price: 1.0,
-    change: "+0.1%",
     isMainToken: false,
   },
   "0x2cFc85d8E48F8EAB294be644d9E25C3030863003": {
@@ -53,8 +47,6 @@ const TOKEN_INFO = {
     color: "text-purple-400",
     bgColor: "bg-purple-500/20",
     borderColor: "border-purple-500/30",
-    price: 2.85,
-    change: "+15.7%",
     isMainToken: false,
   },
 }
@@ -81,26 +73,11 @@ export default function TokenBalanceCard({ tokenBalances, isLoading, onRefresh }
     }
   }
 
-  const calculateUSDValue = (balance: string, decimals: number, price: number) => {
-    if (!balance || balance === "0") return 0
-
-    try {
-      const formatted = formatUnits(balance, decimals)
-      const num = Number.parseFloat(formatted)
-      return num * price
-    } catch (error) {
-      return 0
-    }
-  }
-
-  const totalUSDValue = Object.entries(TOKEN_INFO).reduce((total, [address, info]) => {
-    const balance = tokenBalances[address] || "0"
-    return total + calculateUSDValue(balance, info.decimals, info.price)
-  }, 0)
-
   // Separa TPF dos outros tokens
   const tpfToken = Object.entries(TOKEN_INFO).find(([_, info]) => info.isMainToken)
   const otherTokens = Object.entries(TOKEN_INFO).filter(([_, info]) => !info.isMainToken)
+
+  const hasAnyBalance = Object.values(tokenBalances).some((balance) => balance && balance !== "0")
 
   return (
     <Card className="bg-gray-900/70 border-2 border-cyan-500/30 backdrop-blur-sm hover:border-cyan-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/25 relative overflow-hidden">
@@ -115,7 +92,7 @@ export default function TokenBalanceCard({ tokenBalances, isLoading, onRefresh }
               variant="secondary"
               className="text-xs bg-cyan-500/20 text-cyan-400 border-cyan-500/30 animate-pulse"
             >
-              LIVE
+              REAL
             </Badge>
           </div>
           <Button
@@ -127,20 +104,6 @@ export default function TokenBalanceCard({ tokenBalances, isLoading, onRefresh }
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
           </Button>
-        </div>
-
-        {/* Total Portfolio Value */}
-        <div className="mt-2 p-3 rounded-lg bg-gradient-to-r from-cyan-500/10 to-purple-500/10 border border-cyan-500/30">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-400">Total Portfolio</span>
-            <div className="flex items-center gap-1 text-green-400">
-              <TrendingUp className="w-3 h-3 animate-bounce" />
-              <span className="text-xs">+8.2%</span>
-            </div>
-          </div>
-          <div className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent animate-pulse">
-            ${totalUSDValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
         </div>
       </CardHeader>
 
@@ -163,15 +126,8 @@ export default function TokenBalanceCard({ tokenBalances, isLoading, onRefresh }
                     <Badge className="text-xs px-2 py-1 bg-gradient-to-r from-cyan-500/30 to-purple-500/30 text-cyan-300 border-cyan-500/40 animate-pulse">
                       MAIN
                     </Badge>
-                    <Badge
-                      variant="secondary"
-                      className="text-xs px-1.5 py-0.5 bg-green-500/20 text-green-400 border-green-500/30"
-                    >
-                      +12.5%
-                    </Badge>
                   </div>
                   <div className="text-sm text-gray-300">TPulseFi Token</div>
-                  <div className="text-xs text-cyan-400 font-medium">$1.502</div>
                 </div>
               </div>
 
@@ -180,14 +136,6 @@ export default function TokenBalanceCard({ tokenBalances, isLoading, onRefresh }
                   {isLoading ? "..." : formatBalance(tokenBalances[tpfToken[0]] || "0", tpfToken[1].decimals)}
                 </div>
                 <div className="text-xs text-gray-400">TPF</div>
-                <div className="text-sm text-cyan-300 font-medium">
-                  $
-                  {calculateUSDValue(
-                    tokenBalances[tpfToken[0]] || "0",
-                    tpfToken[1].decimals,
-                    tpfToken[1].price,
-                  ).toFixed(2)}
-                </div>
               </div>
 
               <ExternalLink className="w-4 h-4 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300 relative z-10" />
@@ -198,7 +146,6 @@ export default function TokenBalanceCard({ tokenBalances, isLoading, onRefresh }
           {otherTokens.map(([address, info]) => {
             const balance = tokenBalances[address] || "0"
             const formattedBalance = formatBalance(balance, info.decimals)
-            const usdValue = calculateUSDValue(balance, info.decimals, info.price)
 
             return (
               <div
@@ -214,19 +161,8 @@ export default function TokenBalanceCard({ tokenBalances, isLoading, onRefresh }
                   <div>
                     <div className="flex items-center gap-2">
                       <span className={`text-sm font-medium ${info.color}`}>{info.symbol}</span>
-                      <Badge
-                        variant="secondary"
-                        className={`text-xs px-1.5 py-0.5 ${
-                          info.change.startsWith("+")
-                            ? "bg-green-500/20 text-green-400 border-green-500/30"
-                            : "bg-red-500/20 text-red-400 border-red-500/30"
-                        }`}
-                      >
-                        {info.change}
-                      </Badge>
                     </div>
                     <div className="text-xs text-gray-500">{info.name}</div>
-                    <div className="text-xs text-gray-400">${info.price.toFixed(2)}</div>
                   </div>
                 </div>
 
@@ -235,7 +171,6 @@ export default function TokenBalanceCard({ tokenBalances, isLoading, onRefresh }
                     {isLoading ? "..." : formattedBalance}
                   </div>
                   <div className="text-xs text-gray-500">{info.symbol}</div>
-                  <div className="text-xs text-gray-400">${usdValue.toFixed(2)}</div>
                 </div>
 
                 <ExternalLink className="w-3 h-3 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -248,18 +183,21 @@ export default function TokenBalanceCard({ tokenBalances, isLoading, onRefresh }
               <div className="flex items-center gap-3 text-cyan-400">
                 <RefreshCw className="w-5 h-5 animate-spin" />
                 <div className="text-center">
-                  <div className="text-sm font-medium">Conectando ao WorldChain...</div>
-                  <div className="text-xs text-gray-400 mt-1">Chain ID: 480 (0x1e0)</div>
+                  <div className="text-sm font-medium">Carregando dados REAIS...</div>
+                  <div className="text-xs text-gray-400 mt-1">WorldChain RPC</div>
                 </div>
               </div>
             </div>
           )}
 
-          {!isLoading && Object.keys(tokenBalances).length === 0 && (
+          {!isLoading && !hasAnyBalance && (
             <div className="text-center py-6 text-gray-400">
               <Wallet className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <div className="text-sm">Nenhum token encontrado</div>
-              <div className="text-xs mt-1">Verifique a conexão com o WorldChain</div>
+              <div className="text-xs mt-1 flex items-center justify-center gap-1">
+                <AlertTriangle className="w-3 h-3" />
+                Dados REAIS da blockchain
+              </div>
             </div>
           )}
         </div>

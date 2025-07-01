@@ -22,12 +22,6 @@ export default function WorldChainStatus() {
           text: "CONECTADO",
           color: "bg-green-500/20 text-green-400 border-green-500/30",
         }
-      case "mock":
-        return {
-          icon: <AlertTriangle className="w-3 h-3" />,
-          text: "MODO DEMO",
-          color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-        }
       case "error":
         return {
           icon: <WifiOff className="w-3 h-3" />,
@@ -64,7 +58,7 @@ export default function WorldChainStatus() {
               className={`text-xs ${
                 sdkLoaded
                   ? "bg-blue-500/20 text-blue-400 border-blue-500/30"
-                  : "bg-orange-500/20 text-orange-400 border-orange-500/30"
+                  : "bg-red-500/20 text-red-400 border-red-500/30"
               }`}
             >
               {sdkLoaded ? (
@@ -106,17 +100,17 @@ export default function WorldChainStatus() {
             <span>Block Time: 2s</span>
           </div>
 
-          {connectionStatus === "mock" && (
-            <div className="mt-1 text-xs text-yellow-400 flex items-center gap-1">
-              <AlertTriangle className="w-3 h-3" />
-              Usando dados simulados - Execute: npm install bignumber.js@9.3.0 --legacy-peer-deps
+          {connectionStatus === "connected" && (
+            <div className="mt-1 text-xs text-green-400 flex items-center gap-1">
+              <CheckCircle className="w-3 h-3" />
+              Conectado ao WorldChain - Dados REAIS
             </div>
           )}
 
           {connectionStatus === "error" && (
             <div className="mt-1 text-xs text-red-400 flex items-center gap-1">
               <WifiOff className="w-3 h-3" />
-              Erro de conexão - Verifique as dependências
+              Erro de conexão - Verifique a rede
             </div>
           )}
         </div>
