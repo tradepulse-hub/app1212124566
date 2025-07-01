@@ -40,7 +40,6 @@ const nextConfig = {
     config.resolve.alias = {
       ...config.resolve.alias,
       // Redirect bignumber.js to the patched version
-      'bignumber.js$': path.resolve(process.cwd(), 'lib/bignumber-patch.ts'),
     }
 
     // Transpila módulos ES6 para compatibilidade
