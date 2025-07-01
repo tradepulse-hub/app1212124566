@@ -39,15 +39,20 @@ export default function WalletConnect({ onLoginSuccess, onLogout }: WalletConnec
 
       const response = await fetch("/api/auth/session")
 
-      if (response.ok) {
-        const sessionData = await response.json()
-        if (sessionData.authenticated && sessionData.user) {
-          console.log("✅ Sessão TPulseFi encontrada:", sessionData.user)
-          setUser(sessionData.user)
-          if (onLoginSuccess) {
-            onLoginSuccess(sessionData.user)
-          }
-        }
+      // Garantimos que o corpo é JSON antes de tentar fazer o parse
+      const isJson = response.headers.get("content-type")?.toLowerCase().includes("application/json") ?? false
+
+      if (!response.ok || !isJson) {
+        console.log(`ℹ️ Sessão TPulseFi não encontrada (status ${response.status}, json=${isJson})`)
+        return
+      }
+
+      const sessionData = await response.json()
+
+      if (sessionData?.authenticated && sessionData?.user) {
+        console.log("✅ Sessão TPulseFi encontrada:", sessionData.user)
+        setUser(sessionData.user)
+        onLoginSuccess?.(sessionData.user)
       } else {
         console.log("ℹ️ Nenhuma sessão TPulseFi ativa")
       }

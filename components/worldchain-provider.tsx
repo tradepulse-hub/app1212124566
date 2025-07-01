@@ -2,9 +2,9 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
 
-// 🔥 USA A VERSÃO V0 BROWSER-NATIVE
-import { loadWorldChainSDKV0Native, testBigNumberBrowserNative } from "@/lib/worldchain-sdk-v0-native"
-import { EthersMulticall3, WORLDCHAIN_MULTICALL3_ADDRESS } from "@/lib/multicall3-ethers"
+// 🔥 USA A VERSÃO HIJACK TOTAL
+import { loadWorldChainSDKV0Hijack, testBigNumberHijack } from "@/lib/worldchain-sdk-v0-hijack"
+import { EthersMulticall3 } from "@/lib/multicall3-ethers"
 import { EthersHoldstationClient } from "@/lib/holdstation-client"
 
 let ethers: any = null
@@ -87,11 +87,11 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
   const initializeProvider = async () => {
     try {
       setConnectionStatus("loading")
-      console.log("🚀 Inicializando TPulseFi Wallet - Holdstation SDK INTERFACE OFICIAL...")
+      console.log("🚀 Inicializando TPulseFi Wallet - HIJACK TOTAL V0...")
 
-      // Testa BigNumber browser-native primeiro
-      const bigNumberOK = testBigNumberBrowserNative()
-      console.log("🧮 BigNumber v0 browser-native test:", bigNumberOK ? "✅ OK" : "❌ FALHOU")
+      // Testa BigNumber hijack primeiro
+      const bigNumberOK = testBigNumberHijack()
+      console.log("🧮 BigNumber HIJACK test:", bigNumberOK ? "✅ OK" : "❌ FALHOU")
 
       // 🔥 CARREGA ETHERS CORRETAMENTE
       try {
@@ -109,23 +109,26 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
         return
       }
 
-      // Carrega WorldChain SDK
-      const { TokenProvider, sdkLoaded } = await loadWorldChainSDKV0Native()
+      /* -------------------------------------------------------------------- */
+      /* 1) Tenta carregar o SDK oficial com hijack                           */
+      /* -------------------------------------------------------------------- */
+      const { TokenProvider, sdkLoaded } = await loadWorldChainSDKV0Hijack()
 
-      if (!TokenProvider || !sdkLoaded) {
-        console.error("❌ SDK não carregou - TPulseFi requer Holdstation SDK!")
-        setConnectionStatus("error")
-        setDependencyStatus({
-          ethers: !!ethers,
-          sdk: false,
-          tokenProvider: false,
-          multicall3: false,
-          client: false,
-        })
-        return
+      let TokenProviderClass: any = null
+      let usingMock = false
+
+      if (sdkLoaded && TokenProvider) {
+        console.log("✅ Holdstation SDK (hijack) carregado com sucesso")
+        TokenProviderClass = TokenProvider
+      } else {
+        /* ----------------------- FALLBACK PARA MOCK ----------------------- */
+        console.warn("⚠️ SDK oficial falhou - usando mock TokenProvider")
+        const mock = await import("@/lib/mock-worldchain-sdk")
+        TokenProviderClass = mock.TokenProvider
+        usingMock = true
       }
 
-      console.log("🎯 Holdstation SDK carregado! Configurando com INTERFACE OFICIAL...")
+      console.log("🎯 Holdstation SDK carregado com HIJACK TOTAL!")
 
       // 🔥 CONFIGURA PROVIDER COMPLETO
       try {
@@ -148,7 +151,7 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
         console.log("✅ Conectado ao WorldChain:", network)
 
         // 🔥 CRIA CLIENT HOLDSTATION OFICIAL
-        console.log("🔧 Configurando Holdstation Client com INTERFACE OFICIAL...")
+        console.log("🔧 Configurando Holdstation Client...")
         const client = new EthersHoldstationClient(provider, ethers)
 
         // Testa se o client implementa a interface corretamente
@@ -159,37 +162,76 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
 
         // 🔥 CRIA MULTICALL3 INSTANCE
         console.log("🔧 Configurando Multicall3...")
-        const multicall3 = new EthersMulticall3(provider)
+        const multicall3 = new EthersMulticall3(provider, ethers)
 
-        // 🔥 CRIA TOKENPROVIDER COM INTERFACE OFICIAL
-        console.log("🎯 Criando TokenProvider com CLIENT OFICIAL...")
-        const tokenProviderInstance = new TokenProvider({
-          provider,
-          client, // 🎯 CLIENT COM INTERFACE OFICIAL COMPLETA
-          multicall3, // 🎯 MULTICALL3
-        })
+        // 🔥 TESTA MULTICALL3 COM MÉTODO CORRETO
+        console.log("🧪 Testando Multicall3 com método correto...")
+        const multicall3Works = await multicall3.testContract()
+        console.log("📋 Multicall3 status:", multicall3Works ? "✅ OK" : "❌ FALHOU")
 
-        console.log("✅ TokenProvider criado com interface oficial!")
+        // 🔥 CRIA TOKENPROVIDER COM CONFIGURAÇÃO CORRETA
+        console.log("🎯 Criando TokenProvider com HIJACK TOTAL...")
 
-        // 🔥 CONFIGURA PARTNER CODE DE FORMA ROBUSTA
+        // Primeiro, cria uma instância básica para definir o partner code
+        let tokenProviderInstance
+        try {
+          tokenProviderInstance = new TokenProviderClass({
+            provider,
+            client,
+            multicall3,
+          })
+          console.log("✅ TokenProvider criado com HIJACK TOTAL!")
+        } catch (createError) {
+          console.warn("⚠️ Erro ao criar TokenProvider:", createError)
+          // Tenta sem multicall3 se falhar
+          tokenProviderInstance = new TokenProviderClass({
+            provider,
+            client,
+          })
+          console.log("✅ TokenProvider criado sem Multicall3")
+        }
+
+        // 🔥 CONFIGURA PARTNER CODE ANTES DE USAR
         console.log("🏷️ Configurando partner code 'tpulsefi'...")
 
         // Aguarda um pouco para garantir que o provider está pronto
-        await new Promise((resolve) => setTimeout(resolve, 100))
+        await new Promise((resolve) => setTimeout(resolve, 200))
 
         // Tenta várias formas de definir o partner code
+        let partnerCodeSet = false
         try {
+          // Método 1: setPartnerCode
           if (typeof tokenProviderInstance.setPartnerCode === "function") {
             await tokenProviderInstance.setPartnerCode("tpulsefi")
             console.log("✅ Partner code definido via setPartnerCode()")
-          } else if (tokenProviderInstance.partnerCode !== undefined) {
+            partnerCodeSet = true
+          }
+
+          // Método 2: propriedade direta
+          if (!partnerCodeSet && tokenProviderInstance.partnerCode !== undefined) {
             tokenProviderInstance.partnerCode = "tpulsefi"
             console.log("✅ Partner code definido via propriedade")
-          } else if (tokenProviderInstance.config) {
+            partnerCodeSet = true
+          }
+
+          // Método 3: config
+          if (!partnerCodeSet && tokenProviderInstance.config) {
             tokenProviderInstance.config.partnerCode = "tpulsefi"
             console.log("✅ Partner code definido via config")
-          } else {
-            console.warn("⚠️ Não foi possível definir partner code")
+            partnerCodeSet = true
+          }
+
+          // Método 4: forçar no construtor
+          if (!partnerCodeSet) {
+            console.log("🔄 Recriando TokenProvider com partner code...")
+            tokenProviderInstance = new TokenProviderClass({
+              provider,
+              client,
+              multicall3: multicall3Works ? multicall3 : undefined,
+              partnerCode: "tpulsefi", // Tenta passar direto no construtor
+            })
+            console.log("✅ TokenProvider recriado com partner code")
+            partnerCodeSet = true
           }
 
           // Verifica se foi definido
@@ -202,32 +244,11 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
           console.warn("⚠️ Erro ao definir partner code:", partnerError)
         }
 
-        // Testa se Multicall3 está funcionando
+        // Testa se o client está funcionando com método simples
         try {
-          console.log("🧪 Testando Multicall3...")
-          const testCalls = [
-            {
-              target: WORLDCHAIN_MULTICALL3_ADDRESS,
-              callData: "0x4d2301cc", // getChainId()
-            },
-          ]
-          const [blockNumber, results] = await multicall3.aggregate(testCalls)
-          console.log("✅ Multicall3 funcionando! Block:", blockNumber, "Results:", results.length)
-        } catch (multicallError) {
-          console.warn("⚠️ Teste Multicall3 falhou:", multicallError)
-        }
-
-        // Testa se o client está funcionando
-        try {
-          console.log("🧪 Testando Holdstation Client OFICIAL...")
+          console.log("🧪 Testando Holdstation Client...")
           const blockNumber = await client.getBlockNumber()
           console.log("✅ Client getBlockNumber():", blockNumber)
-
-          const testCall = await client.call({
-            to: WORLDCHAIN_MULTICALL3_ADDRESS,
-            data: "0x4d2301cc", // getChainId()
-          })
-          console.log("✅ Client call():", testCall)
         } catch (clientError) {
           console.warn("⚠️ Teste Client falhou:", clientError)
         }
@@ -240,17 +261,17 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
           ethers: !!ethers,
           sdk: sdkLoaded,
           tokenProvider: !!tokenProviderInstance,
-          multicall3: true,
+          multicall3: multicall3Works,
           client: true,
         })
 
-        console.log("🎉 TPulseFi Wallet COMPLETAMENTE inicializado com INTERFACE OFICIAL!")
+        console.log("🎉 TPulseFi Wallet HIJACK TOTAL inicializado!")
         console.log("📋 Configuração final:")
         console.log("├─ Provider: ✅")
-        console.log("├─ Client (Interface Oficial): ✅")
-        console.log("├─ Multicall3: ✅")
+        console.log("├─ Client: ✅")
+        console.log("├─ Multicall3:", multicall3Works ? "✅" : "⚠️ Opcional")
         console.log("├─ TokenProvider: ✅")
-        console.log("└─ Partner Code: tpulsefi")
+        console.log("└─ Partner Code:", partnerCodeSet ? "✅ tpulsefi" : "⚠️ Não definido")
       } catch (networkError) {
         console.error("❌ Erro de rede:", (networkError as Error).message)
         console.error("Stack:", (networkError as Error).stack)

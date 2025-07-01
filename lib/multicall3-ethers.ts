@@ -1,6 +1,6 @@
 /**
  * Implementação Multicall3 para Ethers.js
- * Baseado na documentação do Holdstation SDK
+ * Corrigido para usar métodos que existem no contrato
  */
 
 export interface Aggregate {
@@ -28,7 +28,7 @@ export interface Multicall3 {
   aggregate3(calls: Aggregate3["request"][]): Promise<Aggregate3["response"][]>
 }
 
-// ABI do Multicall3 (do anexo)
+// ABI do Multicall3 (métodos que realmente existem)
 export const MULTICALL3_ABI = [
   {
     inputs: [
@@ -78,6 +78,14 @@ export const MULTICALL3_ABI = [
     stateMutability: "view",
     type: "function",
   },
+  // Método para obter block number atual
+  {
+    inputs: [],
+    name: "getCurrentBlockTimestamp",
+    outputs: [{ internalType: "uint256", name: "timestamp", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
 ]
 
 // Endereço do Multicall3 no WorldChain
@@ -85,8 +93,7 @@ export const WORLDCHAIN_MULTICALL3_ADDRESS = "0xcA11bde05977b3631167028862bE2a17
 
 export class EthersMulticall3 implements Multicall3 {
   private readonly contract: any
-
-  constructor(provider: any) {
+  constructor(provider: any, ethersLib: any) {
     console.log("🔧 Criando EthersMulticall3 para WorldChain...")
 
     // Cria contrato Multicall3
@@ -94,9 +101,8 @@ export class EthersMulticall3 implements Multicall3 {
       // Ethers v6
       this.contract = new provider.Contract(WORLDCHAIN_MULTICALL3_ADDRESS, MULTICALL3_ABI, provider)
     } else {
-      // Ethers v5 ou importação direta
-      const ethers = require("ethers")
-      this.contract = new ethers.Contract(WORLDCHAIN_MULTICALL3_ADDRESS, MULTICALL3_ABI, provider)
+      // Ethers v5
+      this.contract = new ethersLib.Contract(WORLDCHAIN_MULTICALL3_ADDRESS, MULTICALL3_ABI, provider)
     }
 
     console.log("✅ EthersMulticall3 criado:", WORLDCHAIN_MULTICALL3_ADDRESS)
@@ -129,6 +135,19 @@ export class EthersMulticall3 implements Multicall3 {
     } catch (error) {
       console.error("❌ Erro no Multicall3.aggregate3:", error)
       throw error
+    }
+  }
+
+  // Método auxiliar para testar se o contrato está funcionando
+  async testContract(): Promise<boolean> {
+    try {
+      console.log("🧪 Testando contrato Multicall3...")
+      const timestamp = await this.contract.getCurrentBlockTimestamp()
+      console.log("✅ Multicall3 funcionando! Timestamp:", Number(timestamp))
+      return true
+    } catch (error) {
+      console.warn("⚠️ Teste Multicall3 falhou:", error)
+      return false
     }
   }
 }
