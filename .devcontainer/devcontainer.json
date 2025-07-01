@@ -1,24 +1,28 @@
 {
   "name": "TPulseFi Wallet Development",
-  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-20-bullseye",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:18",
   "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/devcontainers/features/node:1": {
-      "nodeGypDependencies": true,
-      "version": "20"
-    },
-    "ghcr.io/devcontainers/features/github-cli:1": {}
+      "version": "18"
+    }
   },
   "customizations": {
     "vscode": {
-      "extensions": ["bradlc.vscode-tailwindcss", "esbenp.prettier-vscode", "ms-vscode.vscode-typescript-next"],
+      "extensions": [
+        "bradlc.vscode-tailwindcss",
+        "esbenp.prettier-vscode",
+        "ms-vscode.vscode-typescript-next",
+        "ms-vscode.vscode-json"
+      ],
       "settings": {
-        "terminal.integrated.defaultProfile.linux": "bash",
-        "typescript.preferences.includePackageJsonAutoImports": "auto"
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "typescript.preferences.importModuleSpecifier": "relative"
       }
     }
   },
   "forwardPorts": [3000],
   "postCreateCommand": "npm install && npm run install-worldchain",
-  "postStartCommand": "npm run test-deps",
-  "remoteUser": "node"
+  "postStartCommand": "npm run test-deps"
 }

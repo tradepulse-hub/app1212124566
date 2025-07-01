@@ -7,87 +7,99 @@
 # Parar processo
 Ctrl+C
 
-# Limpar e reinstalar
-rm -rf node_modules package-lock.json
+# Limpar tudo
+rm -rf node_modules package-lock.json .next
 npm cache clean --force
-npm install
+
+# Reinstalar
+npm install --no-optional --no-fund --no-audit
 \`\`\`
 
-### 2. **Dependências do WorldChain falhando**
+### 2. **Dependências WorldChain não encontradas**
 \`\`\`bash
-# Reinstalar dependências específicas
-npm uninstall @holdstation/worldchain-sdk @holdstation/worldchain-ethers-v6
-npm install @holdstation/worldchain-sdk@latest @holdstation/worldchain-ethers-v6@latest
+# Instalar manualmente
+npm install @holdstation/worldchain-sdk
+npm install @holdstation/worldchain-ethers-v6
+npm install ethers
+npm install bignumber.js
 \`\`\`
 
 ### 3. **Erro de BigNumber**
 \`\`\`bash
-# Verificar versão do ethers
-npm list ethers
+# Verificar versão
+npm list bignumber.js
 
-# Se necessário, forçar versão
+# Reinstalar se necessário
+npm uninstall bignumber.js
+npm install bignumber.js@^9.1.2
+\`\`\`
+
+### 4. **Conflitos de versão do Ethers**
+\`\`\`bash
+# Forçar versão específica
 npm install ethers@^6.8.0 --save-exact
 \`\`\`
 
-### 4. **Vulnerabilidades de segurança**
-\`\`\`bash
-# Corrigir automaticamente
-npm audit fix
+## 🛠️ Scripts Úteis
 
-# Se persistir
-npm audit fix --force
-\`\`\`
-
-## 🧪 **Comandos de Teste**
-
-### Testar dependências:
+### Testar Dependências
 \`\`\`bash
 npm run test-deps
 \`\`\`
 
-### Correção rápida:
+### Correção Rápida
 \`\`\`bash
 npm run quick-fix
 \`\`\`
 
-### Teste manual:
+### Instalação Limpa
+\`\`\`bash
+npm run clean && npm install
+\`\`\`
+
+## 🔍 Verificações Manuais
+
+### 1. **Verificar Node.js**
+\`\`\`bash
+node --version  # Deve ser >= 16.0.0
+npm --version   # Deve ser >= 8.0.0
+\`\`\`
+
+### 2. **Verificar Dependências**
+\`\`\`bash
+npm list @holdstation/worldchain-sdk
+npm list ethers
+npm list bignumber.js
+\`\`\`
+
+### 3. **Teste Manual**
 \`\`\`bash
 node -e "
-console.log('Testando SDK...');
+console.log('Testando...');
 try {
   const sdk = require('@holdstation/worldchain-sdk');
-  console.log('✅ SDK OK:', Object.keys(sdk));
+  console.log('✅ SDK OK');
 } catch (e) {
-  console.log('❌ SDK falhou:', e.message);
+  console.log('❌ SDK Falhou:', e.message);
 }
 "
 \`\`\`
 
-## 🔄 **Reset Completo**
+## 🆘 Se Nada Funcionar
 
-Se nada funcionar:
+1. **Deletar Codespace atual**
+2. **Criar novo Codespace**
+3. **Aguardar setup automático**
+4. **Executar:**
+   \`\`\`bash
+   npm install
+   npm run install-worldchain
+   npm run test-deps
+   npm run dev
+   \`\`\`
 
-\`\`\`bash
-# 1. Limpar tudo
-rm -rf node_modules package-lock.json .next
+## 📞 Suporte
 
-# 2. Reinstalar do zero
-npm install
-
-# 3. Instalar WorldChain
-npm run install-worldchain
-
-# 4. Testar
-npm run test-deps
-
-# 5. Iniciar
-npm run dev
-\`\`\`
-
-## 📞 **Suporte**
-
-Se os problemas persistirem:
-1. Verifique os logs completos
-2. Documente o erro exato
-3. Inclua versão do Node.js: `node --version`
-4. Inclua versão do NPM: `npm --version`
+- **GitHub Issues**: Reporte problemas no repositório
+- **Logs**: Sempre inclua logs completos
+- **Versões**: Mencione versões do Node.js e npm
