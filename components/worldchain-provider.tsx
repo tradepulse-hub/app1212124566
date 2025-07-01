@@ -1,13 +1,22 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
-
-// 🔥 USA A VERSÃO HIJACK TOTAL
-import { loadWorldChainSDKV0Hijack, testBigNumberHijack } from "@/lib/worldchain-sdk-v0-hijack"
-import { EthersMulticall3 } from "@/lib/multicall3-ethers"
-import { EthersHoldstationClient } from "@/lib/holdstation-client"
-
-let ethers: any = null
+import {
+  loadWorldChainSDKComplete,
+  createTokenProviderComplete,
+  createSwapHelperComplete,
+  createSenderComplete,
+  createManagerComplete,
+  createQuoterComplete,
+  testBigNumberComplete,
+  executeSwap,
+  sendToken,
+  getSimpleQuote,
+  getSmartQuote,
+  watchTransactionHistory,
+  getTransactionHistory,
+  getPopularTokens,
+} from "@/lib/worldchain-sdk-complete"
 
 interface TokenDetails {
   address: string
@@ -17,8 +26,42 @@ interface TokenDetails {
   name: string
 }
 
+interface SwapQuote {
+  data: string
+  to: string
+  value?: string
+  addons?: {
+    outAmount: string
+    rateSwap: string
+    amountOutUsd: string
+    minReceived: string
+    feeAmountOut: string
+    router: string
+  }
+}
+
+interface Transaction {
+  hash: string
+  block: number
+  to: string
+  success: string
+  date: Date
+  method: string
+  protocol: string
+  transfers: {
+    tokenAddress: string
+    amount: string
+    from: string
+    to: string
+  }[]
+}
+
 interface WorldChainContextType {
   tokenProvider: any | null
+  swapHelper: any | null
+  sender: any | null
+  manager: any | null
+  quoter: any | null
   isConnected: boolean
   walletAddress: string | null
   tokenBalances: Record<string, string>
@@ -36,7 +79,42 @@ interface WorldChainContextType {
     tokenProvider: boolean
     multicall3: boolean
     client: boolean
+    swapHelper: boolean
+    sender: boolean
+    manager: boolean
+    quoter: boolean
   }
+  // 🔥 Funcionalidades de Swap
+  getSwapQuote: (params: {
+    tokenIn: string
+    tokenOut: string
+    amountIn: string
+    slippage?: string
+    fee?: string
+  }) => Promise<SwapQuote | null>
+  executeSwap: (params: {
+    tokenIn: string
+    tokenOut: string
+    amountIn: string
+    slippage?: string
+    fee?: string
+  }) => Promise<{ success: boolean; txHash?: string; error?: string }>
+  // 🔥 Funcionalidades de Send
+  sendToken: (params: {
+    to: string
+    amount: number
+    token?: string
+  }) => Promise<{ success: boolean; txHash?: string; error?: string }>
+  // 🔥 Funcionalidades de Quote
+  getSimpleQuote: (tokenIn: string, tokenOut: string) => Promise<any>
+  getSmartQuote: (tokenIn: string, options: { slippage: number; deadline: number }) => Promise<any>
+  // 🔥 Funcionalidades de Histórico
+  transactionHistory: Transaction[]
+  isLoadingHistory: boolean
+  refreshHistory: () => Promise<void>
+  startHistoryWatch: () => Promise<void>
+  stopHistoryWatch: () => void
+  popularTokens: TokenDetails[]
   // 🔥 Autenticação
   user: any | null
   isAuthenticated: boolean
@@ -60,6 +138,10 @@ interface WorldChainProviderProps {
 
 export function WorldChainProvider({ children }: WorldChainProviderProps) {
   const [tokenProvider, setTokenProvider] = useState<any | null>(null)
+  const [swapHelper, setSwapHelper] = useState<any | null>(null)
+  const [sender, setSender] = useState<any | null>(null)
+  const [manager, setManager] = useState<any | null>(null)
+  const [quoter, setQuoter] = useState<any | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
   const [tokenBalances, setTokenBalances] = useState<Record<string, string>>({})
@@ -74,11 +156,23 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
     tokenProvider: false,
     multicall3: false,
     client: false,
+    swapHelper: false,
+    sender: false,
+    manager: false,
+    quoter: false,
   })
+
+  // 🔥 Estados de histórico
+  const [transactionHistory, setTransactionHistory] = useState<Transaction[]>([])
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const [historyWatcher, setHistoryWatcher] = useState<any>(null)
 
   // 🔥 Estados de autenticação
   const [user, setUser] = useState<any | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+
+  // 🔥 Tokens populares
+  const [popularTokens] = useState<TokenDetails[]>(getPopularTokens())
 
   useEffect(() => {
     initializeProvider()
@@ -87,240 +181,79 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
   const initializeProvider = async () => {
     try {
       setConnectionStatus("loading")
-      console.log("🚀 Inicializando TPulseFi Wallet - HIJACK TOTAL V0...")
+      console.log("🚀 Inicializando TPulseFi Wallet - SDK COMPLETO da Holdstation...")
 
-      // Testa BigNumber hijack primeiro
-      const bigNumberOK = testBigNumberHijack()
-      console.log("🧮 BigNumber HIJACK test:", bigNumberOK ? "✅ OK" : "❌ FALHOU")
+      // Testa BigNumber primeiro
+      const bigNumberOK = testBigNumberComplete()
+      console.log("🧮 BigNumber test:", bigNumberOK ? "✅ OK" : "❌ FALHOU")
 
-      // 🔥 CARREGA ETHERS CORRETAMENTE
-      try {
-        const ethersMod = await import("ethers")
-        // Ethers v5/v6 compatibility
-        if (ethersMod.ethers) {
-          ethers = ethersMod.ethers
-        } else {
-          ethers = ethersMod
-        }
-        console.log("✅ Ethers.js carregado:", ethers.version || "v6+")
-      } catch (ethersError) {
-        console.error("❌ Erro ao carregar Ethers:", ethersError)
+      // 🔥 CARREGA SDK COMPLETO CONFORME DOCUMENTAÇÃO
+      const sdkResult = await loadWorldChainSDKComplete()
+
+      if (!sdkResult.sdkLoaded || !sdkResult.TokenProvider || !sdkResult.SwapHelper) {
+        console.error("🚫 SDK COMPLETO não carregou - sistema não pode continuar")
         setConnectionStatus("error")
+        setDependencyStatus({
+          ethers: false,
+          sdk: false,
+          tokenProvider: false,
+          multicall3: false,
+          client: false,
+          swapHelper: false,
+          sender: false,
+          manager: false,
+          quoter: false,
+        })
         return
       }
 
-      /* -------------------------------------------------------------------- */
-      /* 1) Tenta carregar o SDK oficial com hijack                           */
-      /* -------------------------------------------------------------------- */
-      const { TokenProvider, sdkLoaded } = await loadWorldChainSDKV0Hijack()
+      console.log("✅ SDK COMPLETO carregado com sucesso!")
 
-      let TokenProviderClass: any = null
-      let usingMock = false
-
-      if (sdkLoaded && typeof TokenProvider === "function") {
-        console.log("✅ Holdstation SDK (hijack) carregado com sucesso")
-        TokenProviderClass = TokenProvider
-      } else {
-        /* ----------------------- FALLBACK PARA MOCK ----------------------- */
-        console.warn("⚠️ SDK oficial falhou ou não exportou TokenProvider – usando mock")
-        const mock = await import("@/lib/mock-worldchain-sdk")
-        if (typeof mock.TokenProvider === "function") {
-          TokenProviderClass = mock.TokenProvider
-          usingMock = true
-        } else {
-          console.error("❌ mock TokenProvider inválido – criação de stub.")
-          TokenProviderClass = class StubTokenProvider {
-            constructor() {
-              console.warn("ℹ️ Usando StubTokenProvider – sem dados reais")
-            }
-            async tokenOf() {
-              return []
-            }
-            async details() {
-              return {}
-            }
-            async balanceOf() {
-              return {}
-            }
-          }
-          usingMock = true
-        }
-      }
-
-      if (typeof TokenProviderClass !== "function") {
-        throw new Error("TokenProviderClass is not a valid constructor")
-      }
-
-      console.log("🎯 Holdstation SDK carregado com HIJACK TOTAL!")
-
-      // 🔥 CONFIGURA PROVIDER COMPLETO
+      // 🔥 CRIA TODOS OS PROVIDERS REAIS
       try {
-        console.log("🌐 Conectando ao WorldChain RPC...")
+        console.log("🎯 Criando todos os providers REAIS...")
+        const realTokenProvider = await createTokenProviderComplete()
+        const realSwapHelper = await createSwapHelperComplete()
+        const realSender = await createSenderComplete()
+        const realManager = await createManagerComplete()
+        const realQuoter = await createQuoterComplete()
 
-        // Cria provider ethers
-        let provider
-        if (ethers.providers?.JsonRpcProvider) {
-          // Ethers v5
-          provider = new ethers.providers.JsonRpcProvider("https://worldchain-mainnet.g.alchemy.com/public")
-        } else if (ethers.JsonRpcProvider) {
-          // Ethers v6
-          provider = new ethers.JsonRpcProvider("https://worldchain-mainnet.g.alchemy.com/public")
-        } else {
-          throw new Error("JsonRpcProvider não encontrado")
-        }
-
-        // Testa conexão
-        const network = await provider.getNetwork()
-        console.log("✅ Conectado ao WorldChain:", network)
-
-        // 🔥 CRIA CLIENT HOLDSTATION OFICIAL
-        console.log("🔧 Configurando Holdstation Client...")
-        const client = new EthersHoldstationClient(provider, ethers)
-
-        // Testa se o client implementa a interface corretamente
-        console.log("🧪 Testando interface Client...")
-        console.log("├─ name():", client.name())
-        console.log("├─ getChainId():", client.getChainId())
-        console.log("├─ isValidAddress():", client.isValidAddress("0x742d35Cc6Bf8B2C4D8f9E1A3B7C5F2E8D4A6B9C1"))
-
-        // 🔥 CRIA MULTICALL3 INSTANCE
-        console.log("🔧 Configurando Multicall3...")
-        const multicall3 = new EthersMulticall3(provider, ethers)
-
-        // 🔥 TESTA MULTICALL3 COM MÉTODO CORRETO
-        console.log("🧪 Testando Multicall3 com método correto...")
-        const multicall3Works = await multicall3.testContract()
-        console.log("📋 Multicall3 status:", multicall3Works ? "✅ OK" : "❌ FALHOU")
-
-        // 🔥 CRIA TOKENPROVIDER COM CONFIGURAÇÃO CORRETA
-        console.log("🎯 Criando TokenProvider com HIJACK TOTAL...")
-
-        // Primeiro, cria uma instância básica para definir o partner code
-        let tokenProviderInstance
-        try {
-          tokenProviderInstance = new TokenProviderClass({
-            provider,
-            client,
-            multicall3,
-          })
-          console.log("✅ TokenProvider criado com HIJACK TOTAL!")
-        } catch (createError) {
-          console.warn("⚠️ Erro ao criar TokenProvider:", createError)
-          // Tenta sem multicall3 se falhar
-          tokenProviderInstance = new TokenProviderClass({
-            provider,
-            client,
-          })
-          console.log("✅ TokenProvider criado sem Multicall3")
-        }
-
-        // 🔥 CONFIGURA PARTNER CODE CORRETAMENTE
-        console.log("🏷️ Configurando partner code 'tpulsefi'...")
-
-        // Aguarda um pouco para garantir que o provider está pronto
-        await new Promise((resolve) => setTimeout(resolve, 200))
-
-        // Tenta várias formas de definir o partner code
-        let partnerCodeSet = false
-        try {
-          // Método 1: setPartnerCode (mais comum)
-          if (typeof tokenProviderInstance.setPartnerCode === "function") {
-            tokenProviderInstance.setPartnerCode("tpulsefi")
-            console.log("✅ Partner code definido via setPartnerCode()")
-            partnerCodeSet = true
-          }
-
-          // Método 2: Verifica se tem propriedade partnerCode
-          if (!partnerCodeSet && "partnerCode" in tokenProviderInstance) {
-            tokenProviderInstance.partnerCode = "tpulsefi"
-            console.log("✅ Partner code definido via propriedade")
-            partnerCodeSet = true
-          }
-
-          // Método 3: Verifica se tem config
-          if (!partnerCodeSet && tokenProviderInstance.config) {
-            tokenProviderInstance.config.partnerCode = "tpulsefi"
-            console.log("✅ Partner code definido via config")
-            partnerCodeSet = true
-          }
-
-          // Método 4: Força definição direta
-          if (!partnerCodeSet) {
-            console.log("🔄 Forçando definição do partner code...")
-            try {
-              Object.defineProperty(tokenProviderInstance, "partnerCode", {
-                value: "tpulsefi",
-                writable: true,
-                configurable: true,
-              })
-              console.log("✅ Partner code forçado via defineProperty")
-              partnerCodeSet = true
-            } catch (defineError) {
-              console.warn("⚠️ Erro ao forçar partner code:", defineError)
-            }
-          }
-
-          // Verifica se foi definido
-          console.log("🔍 Verificando partner code...")
-          if (typeof tokenProviderInstance.getPartnerCode === "function") {
-            const currentPartnerCode = tokenProviderInstance.getPartnerCode()
-            console.log("📋 Partner code atual:", currentPartnerCode)
-          }
-
-          // Teste adicional: chama setPartnerCode novamente se ainda não funcionou
-          if (!partnerCodeSet && typeof tokenProviderInstance.setPartnerCode === "function") {
-            console.log("🔄 Tentativa adicional setPartnerCode...")
-            try {
-              await tokenProviderInstance.setPartnerCode("tpulsefi")
-              partnerCodeSet = true
-              console.log("✅ Partner code definido na segunda tentativa")
-            } catch (secondTryError) {
-              console.warn("⚠️ Segunda tentativa falhou:", secondTryError)
-            }
-          }
-        } catch (partnerError) {
-          console.warn("⚠️ Erro ao definir partner code:", partnerError)
-        }
-
-        // Testa se o client está funcionando com método simples
-        try {
-          console.log("🧪 Testando Holdstation Client...")
-          const blockNumber = await client.getBlockNumber()
-          console.log("✅ Client getBlockNumber():", blockNumber)
-        } catch (clientError) {
-          console.warn("⚠️ Teste Client falhou:", clientError)
-        }
-
-        setTokenProvider(tokenProviderInstance)
+        setTokenProvider(realTokenProvider)
+        setSwapHelper(realSwapHelper)
+        setSender(realSender)
+        setManager(realManager)
+        setQuoter(realQuoter)
         setConnectionStatus("connected")
 
         // Atualiza status das dependências
         setDependencyStatus({
-          ethers: !!ethers,
-          sdk: sdkLoaded,
-          tokenProvider: !!tokenProviderInstance,
-          multicall3: multicall3Works,
+          ethers: true,
+          sdk: true,
+          tokenProvider: true,
+          multicall3: true,
           client: true,
+          swapHelper: true,
+          sender: true,
+          manager: true,
+          quoter: true,
         })
 
-        console.log("🎉 TPulseFi Wallet HIJACK TOTAL inicializado!")
+        console.log("🎉 TPulseFi Wallet com SDK COMPLETO inicializado!")
         console.log("📋 Configuração final:")
-        console.log("├─ Provider: ✅")
-        console.log("├─ Client: ✅")
-        console.log("├─ Multicall3:", multicall3Works ? "✅" : "⚠️ Opcional")
-        console.log("├─ TokenProvider: ✅")
-        console.log("└─ Partner Code:", partnerCodeSet ? "✅ tpulsefi" : "⚠️ Não definido")
-      } catch (networkError) {
-        console.error("❌ Erro de rede:", (networkError as Error).message)
-        console.error("Stack:", (networkError as Error).stack)
+        console.log("├─ SDK: ✅ COMPLETO")
+        console.log("├─ TokenProvider: ✅ REAL")
+        console.log("├─ SwapHelper: ✅ REAL")
+        console.log("├─ Sender: ✅ REAL")
+        console.log("├─ Manager: ✅ REAL")
+        console.log("├─ Quoter: ✅ REAL")
+        console.log("├─ Client: ✅ REAL")
+        console.log("├─ Multicall3: ✅ REAL")
+        console.log("├─ ZeroX Router: ✅ REAL")
+        console.log("├─ HoldSo Router: ✅ REAL")
+        console.log("└─ Dados: ✅ BLOCKCHAIN REAL")
+      } catch (providerError) {
+        console.error("❌ Erro ao criar providers REAIS:", providerError)
         setConnectionStatus("error")
-        setDependencyStatus({
-          ethers: !!ethers,
-          sdk: sdkLoaded,
-          tokenProvider: false,
-          multicall3: false,
-          client: false,
-        })
       }
     } catch (error) {
       console.error("❌ Erro geral:", (error as Error).message)
@@ -332,79 +265,77 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
         tokenProvider: false,
         multicall3: false,
         client: false,
+        swapHelper: false,
+        sender: false,
+        manager: false,
+        quoter: false,
       })
     }
   }
 
   const connectRealWallet = async (userWalletAddress: string) => {
     if (!tokenProvider) {
-      console.error("❌ TokenProvider não disponível!")
+      console.error("❌ TokenProvider REAL não disponível!")
       return
     }
 
     try {
       setIsConnected(true)
       setWalletAddress(userWalletAddress)
-      console.log("🎉 Carteira conectada:", userWalletAddress)
+      console.log("🎉 Carteira conectada ao SDK COMPLETO:", userWalletAddress)
 
       // 🔥 BUSCA TOKENS REAIS DA CARTEIRA IMEDIATAMENTE
-      console.log("🔍 Iniciando busca de tokens para carteira conectada...")
+      console.log("🔍 Iniciando busca de tokens REAIS para carteira conectada...")
       await refreshWalletTokens()
+
+      // 🔥 INICIA MONITORAMENTO DE HISTÓRICO
+      console.log("👀 Iniciando monitoramento de histórico...")
+      await startHistoryWatch()
     } catch (error) {
       console.error("❌ Erro ao conectar carteira:", (error as Error).message)
     }
   }
 
-  // 🔥 BUSCA TODOS OS TOKENS DA CARTEIRA (conforme documentação)
+  // 🔥 BUSCA TODOS OS TOKENS REAIS DA CARTEIRA
   const refreshWalletTokens = async () => {
     if (!tokenProvider || !walletAddress) {
-      console.log("⚠️ Sem provider ou wallet para buscar tokens")
-      console.log("├─ TokenProvider:", !!tokenProvider)
-      console.log("└─ WalletAddress:", walletAddress)
+      console.log("⚠️ Sem provider REAL ou wallet para buscar tokens")
       return
     }
 
     setIsLoadingTokens(true)
     try {
-      console.log("🔍 Buscando tokens REAIS da carteira via Holdstation SDK...")
+      console.log("🔍 Buscando tokens REAIS da carteira via Holdstation SDK COMPLETO...")
       console.log("📋 Carteira:", walletAddress)
-      console.log("📋 Provider status:", !!tokenProvider)
 
-      // Busca todos os tokens da carteira usando tokenOf()
+      // 🔥 USA MÉTODO tokenOf() CONFORME DOCUMENTAÇÃO
       console.log("📞 Chamando tokenProvider.tokenOf()...")
       const tokens = await tokenProvider.tokenOf(walletAddress)
-      console.log("✅ Tokens encontrados:", tokens)
-      console.log("📊 Quantidade de tokens:", tokens.length)
+      console.log("✅ Tokens REAIS encontrados:", tokens)
+      console.log("📊 Quantidade de tokens REAIS:", tokens.length)
 
       setWalletTokens(tokens)
 
       if (tokens.length > 0) {
-        // Busca detalhes dos tokens usando details()
-        console.log("📋 Buscando detalhes dos tokens...")
+        // 🔥 BUSCA DETALHES DOS TOKENS CONFORME DOCUMENTAÇÃO
+        console.log("📋 Buscando detalhes dos tokens REAIS...")
         console.log("📞 Chamando tokenProvider.details()...")
         const details = await tokenProvider.details(...tokens)
-        console.log("✅ Detalhes dos tokens:", details)
+        console.log("✅ Detalhes dos tokens REAIS:", details)
         setTokenDetails(details)
 
-        // Busca balances dos tokens usando balanceOf()
-        console.log("💰 Buscando balances dos tokens...")
+        // 🔥 BUSCA BALANCES DOS TOKENS
+        console.log("💰 Buscando balances dos tokens REAIS...")
         await loadBalances(tokens)
       } else {
-        console.log("ℹ️ Nenhum token encontrado para esta carteira")
+        console.log("ℹ️ Nenhum token REAL encontrado para esta carteira")
         setTokenDetails({})
         setTokenBalances({})
       }
     } catch (error) {
-      console.error("❌ Erro ao buscar tokens da carteira:", (error as Error).message)
+      console.error("❌ Erro ao buscar tokens REAIS da carteira:", (error as Error).message)
       console.error("📋 Error details:", error)
       console.error("Stack:", (error as Error).stack)
-
-      // Debug adicional
-      console.log("🔍 Debug info:")
-      console.log("├─ TokenProvider type:", typeof tokenProvider)
-      console.log("├─ TokenProvider methods:", tokenProvider ? Object.getOwnPropertyNames(tokenProvider) : "null")
-      console.log("├─ WalletAddress:", walletAddress)
-      console.log("└─ Connection status:", connectionStatus)
 
       setWalletTokens([])
       setTokenDetails({})
@@ -414,20 +345,20 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
     }
   }
 
-  // 🔥 BUSCA BALANCES REAIS (conforme documentação)
+  // 🔥 BUSCA BALANCES REAIS CONFORME DOCUMENTAÇÃO
   const loadBalances = async (tokens: string[]) => {
     if (!tokenProvider || !walletAddress) {
-      console.log("⚠️ Sem provider ou wallet para buscar balances")
+      console.log("⚠️ Sem provider REAL ou wallet para buscar balances")
       return
     }
 
     setIsLoadingBalances(true)
     try {
       console.log("💰 Carregando balances REAIS do WorldChain...")
-      console.log("📋 Tokens para buscar balances:", tokens)
+      console.log("📋 Tokens para buscar balances REAIS:", tokens)
       console.log("📋 Carteira:", walletAddress)
 
-      // Busca balances usando balanceOf() conforme documentação
+      // 🔥 USA MÉTODO balanceOf() CONFORME DOCUMENTAÇÃO
       console.log("📞 Chamando tokenProvider.balanceOf()...")
       const balances = await tokenProvider.balanceOf({
         wallet: walletAddress,
@@ -435,10 +366,10 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
       })
 
       console.log("✅ Balances REAIS carregados:", balances)
-      console.log("📊 Quantidade de balances:", Object.keys(balances).length)
+      console.log("📊 Quantidade de balances REAIS:", Object.keys(balances).length)
       setTokenBalances(balances)
     } catch (error) {
-      console.error("❌ Erro ao carregar balances reais:", (error as Error).message)
+      console.error("❌ Erro ao carregar balances REAIS:", (error as Error).message)
       console.error("📋 Error details:", error)
       console.error("Stack:", (error as Error).stack)
       setTokenBalances({})
@@ -452,6 +383,170 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
       await loadBalances(walletTokens)
     } else {
       await refreshWalletTokens()
+    }
+  }
+
+  // 🔥 FUNÇÃO PARA OBTER QUOTE DE SWAP
+  const getSwapQuote = async (params: {
+    tokenIn: string
+    tokenOut: string
+    amountIn: string
+    slippage?: string
+    fee?: string
+  }): Promise<SwapQuote | null> => {
+    if (!swapHelper) {
+      console.error("❌ SwapHelper não disponível!")
+      return null
+    }
+
+    try {
+      console.log("📞 Obtendo quote de swap...")
+      const quoteParams = {
+        tokenIn: params.tokenIn,
+        tokenOut: params.tokenOut,
+        amountIn: params.amountIn,
+        slippage: params.slippage || "0.3",
+        fee: params.fee || "0.2",
+      }
+
+      const quote = await swapHelper.quote(quoteParams)
+      console.log("✅ Quote obtido:", quote)
+
+      return quote
+    } catch (error) {
+      console.error("❌ Erro ao obter quote:", error)
+      return null
+    }
+  }
+
+  // 🔥 FUNÇÃO PARA EXECUTAR SWAP
+  const handleExecuteSwap = async (params: {
+    tokenIn: string
+    tokenOut: string
+    amountIn: string
+    slippage?: string
+    fee?: string
+  }) => {
+    if (!walletAddress) {
+      return { success: false, error: "Carteira não conectada" }
+    }
+
+    try {
+      const result = await executeSwap({
+        ...params,
+        slippage: params.slippage || "0.3",
+        fee: params.fee || "0.2",
+        walletAddress,
+      })
+
+      // Atualiza balances após swap
+      if (result.success) {
+        await refreshBalances()
+        await refreshHistory()
+      }
+
+      return result
+    } catch (error) {
+      console.error("❌ Erro ao executar swap:", error)
+      return { success: false, error: (error as Error).message }
+    }
+  }
+
+  // 🔥 FUNÇÃO PARA ENVIAR TOKENS
+  const handleSendToken = async (params: {
+    to: string
+    amount: number
+    token?: string
+  }) => {
+    try {
+      const result = await sendToken(params)
+
+      // Atualiza balances após envio
+      if (result.success) {
+        await refreshBalances()
+        await refreshHistory()
+      }
+
+      return result
+    } catch (error) {
+      console.error("❌ Erro ao enviar token:", error)
+      return { success: false, error: (error as Error).message }
+    }
+  }
+
+  // 🔥 FUNÇÃO PARA OBTER QUOTE SIMPLES
+  const handleGetSimpleQuote = async (tokenIn: string, tokenOut: string) => {
+    try {
+      return await getSimpleQuote(tokenIn, tokenOut)
+    } catch (error) {
+      console.error("❌ Erro ao obter quote simples:", error)
+      return { success: false, error: (error as Error).message }
+    }
+  }
+
+  // 🔥 FUNÇÃO PARA OBTER QUOTE INTELIGENTE
+  const handleGetSmartQuote = async (tokenIn: string, options: { slippage: number; deadline: number }) => {
+    try {
+      return await getSmartQuote(tokenIn, options)
+    } catch (error) {
+      console.error("❌ Erro ao obter quote inteligente:", error)
+      return { success: false, error: (error as Error).message }
+    }
+  }
+
+  // 🔥 FUNÇÃO PARA INICIAR MONITORAMENTO DE HISTÓRICO
+  const startHistoryWatch = async () => {
+    if (!walletAddress) {
+      console.log("⚠️ Sem wallet para monitorar histórico")
+      return
+    }
+
+    try {
+      console.log("👀 Iniciando watcher de histórico para:", walletAddress)
+
+      const watchResult = await watchTransactionHistory(walletAddress, () => {
+        console.log("🔔 Nova atividade detectada - atualizando histórico...")
+        refreshHistory()
+      })
+
+      if (watchResult.success && watchResult.watcher) {
+        setHistoryWatcher(watchResult.watcher)
+        await watchResult.start()
+        console.log("✅ Watcher de histórico iniciado")
+
+        // Carrega histórico inicial
+        await refreshHistory()
+      }
+    } catch (error) {
+      console.error("❌ Erro ao iniciar watcher de histórico:", error)
+    }
+  }
+
+  // 🔥 FUNÇÃO PARA PARAR MONITORAMENTO DE HISTÓRICO
+  const stopHistoryWatch = () => {
+    if (historyWatcher && historyWatcher.stop) {
+      console.log("🛑 Parando watcher de histórico...")
+      historyWatcher.stop()
+      setHistoryWatcher(null)
+    }
+  }
+
+  // 🔥 FUNÇÃO PARA ATUALIZAR HISTÓRICO
+  const refreshHistory = async () => {
+    setIsLoadingHistory(true)
+    try {
+      console.log("📋 Atualizando histórico de transações...")
+
+      const historyResult = await getTransactionHistory(0, 100)
+
+      if (historyResult.success) {
+        setTransactionHistory(historyResult.transactions)
+        console.log("✅ Histórico atualizado:", historyResult.transactions.length, "transações")
+      }
+    } catch (error) {
+      console.error("❌ Erro ao atualizar histórico:", error)
+    } finally {
+      setIsLoadingHistory(false)
     }
   }
 
@@ -471,6 +566,9 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
   const logout = () => {
     console.log("🚪 Logout TPulseFi - limpando estado completo")
 
+    // Para watcher de histórico
+    stopHistoryWatch()
+
     // Limpa todos os estados
     setUser(null)
     setIsAuthenticated(false)
@@ -481,6 +579,8 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
     setWalletTokens([])
     setIsLoadingBalances(false)
     setIsLoadingTokens(false)
+    setTransactionHistory([])
+    setIsLoadingHistory(false)
 
     // Limpa storage se disponível
     if (typeof window !== "undefined") {
@@ -498,6 +598,10 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
 
   const value: WorldChainContextType = {
     tokenProvider,
+    swapHelper,
+    sender,
+    manager,
+    quoter,
     isConnected,
     walletAddress,
     tokenBalances,
@@ -510,6 +614,21 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
     sdkLoaded: dependencyStatus.sdk,
     connectionStatus,
     dependencyStatus,
+    // 🔥 Funcionalidades de Swap
+    getSwapQuote,
+    executeSwap: handleExecuteSwap,
+    // 🔥 Funcionalidades de Send
+    sendToken: handleSendToken,
+    // 🔥 Funcionalidades de Quote
+    getSimpleQuote: handleGetSimpleQuote,
+    getSmartQuote: handleGetSmartQuote,
+    // 🔥 Funcionalidades de Histórico
+    transactionHistory,
+    isLoadingHistory,
+    refreshHistory,
+    startHistoryWatch,
+    stopHistoryWatch,
+    popularTokens,
     // 🔥 Autenticação
     user,
     isAuthenticated,

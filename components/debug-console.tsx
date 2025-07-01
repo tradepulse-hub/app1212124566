@@ -18,7 +18,7 @@ import {
   Bug,
   Zap,
 } from "lucide-react"
-import { testBigNumberBrowserNative } from "@/lib/worldchain-sdk-v0-native"
+import { testBigNumberReal } from "@/lib/worldchain-sdk-real"
 
 interface LogEntry {
   timestamp: string
@@ -81,68 +81,51 @@ export default function DebugConsole() {
 
   const runDiagnostic = async () => {
     setIsRunning(true)
-    addLog("info", "🔍 Iniciando diagnóstico v0 browser-native...")
+    addLog("info", "🔍 Iniciando diagnóstico SDK REAL...")
 
     try {
       // Test 1: Ambiente
-      addLog("info", "📋 Verificando ambiente v0...")
+      addLog("info", "📋 Verificando ambiente...")
       addLog("info", `User Agent: ${navigator.userAgent.slice(0, 50)}...`)
       addLog("info", `Platform: ${navigator.platform}`)
       addLog("info", `Location: ${window.location.href.slice(0, 50)}...`)
 
-      // Test 2: BigNumber.js browser-native
-      addLog("info", "🧮 Testando BigNumber.js browser-native...")
-      const bigNumberResult = testBigNumberBrowserNative()
+      // Test 2: BigNumber.js
+      addLog("info", "🧮 Testando BigNumber.js...")
+      const bigNumberResult = testBigNumberReal()
       if (bigNumberResult) {
-        addLog("success", "✅ BigNumber.js browser-native funcionando")
+        addLog("success", "✅ BigNumber.js funcionando")
       } else {
-        addLog("error", "❌ BigNumber.js browser-native com problemas")
+        addLog("error", "❌ BigNumber.js com problemas")
       }
 
-      // Test 3: Verificar patches aplicados
-      addLog("info", "🔧 Verificando patches aplicados...")
-      const globalBN = (globalThis as any).BigNumber
-      const windowBN = typeof window !== "undefined" ? (window as any).BigNumber : null
-      const moduleBN = (globalThis as any).__BIGNUMBER_MODULE__
-      const fetchPatched = globalThis.fetch !== fetch
+      // Test 3: SDK Real
+      addLog("info", "🌐 Testando WorldChain SDK REAL...")
+      try {
+        const { loadWorldChainSDKReal } = await import("@/lib/worldchain-sdk-real")
+        const { sdkLoaded, TokenProvider } = await loadWorldChainSDKReal()
 
-      addLog("info", `Global BigNumber: ${typeof globalBN}`)
-      addLog("info", `Window BigNumber: ${typeof windowBN}`)
-      addLog("info", `Module BigNumber: ${typeof moduleBN?.BigNumber}`)
-      addLog("info", `Fetch patchado: ${fetchPatched}`)
+        if (sdkLoaded && TokenProvider) {
+          addLog("success", "✅ WorldChain SDK REAL carregado!")
+          addLog("info", `TokenProvider type: ${typeof TokenProvider}`)
+        } else {
+          addLog("error", "❌ WorldChain SDK REAL falhou")
+        }
+      } catch (error) {
+        addLog("error", `❌ Erro no SDK REAL: ${error.message}`)
+      }
 
-      // Test 4: Import function
-      addLog("info", "🔄 Verificando função import...")
-      const importFn = (globalThis as any).import
-      addLog("info", `Import function: ${typeof importFn}`)
-
-      // Test 5: Ethers.js
+      // Test 4: Ethers.js
       addLog("info", "⚡ Testando Ethers.js...")
       try {
         const ethers = await import("ethers")
         addLog("success", "✅ Ethers.js carregado")
-        addLog("info", `Ethers version: ${ethers.version || "unknown"}`)
+        addLog("info", `Ethers version: ${ethers.version || "v6+"}`)
       } catch (error) {
         addLog("error", `❌ Erro no Ethers.js: ${error.message}`)
       }
 
-      // Test 6: WorldChain SDK v0 native
-      addLog("info", "🌐 Testando WorldChain SDK v0 native...")
-      try {
-        const { loadWorldChainSDKV0Native } = await import("@/lib/worldchain-sdk-v0-native")
-        const { TokenProvider, sdkLoaded } = await loadWorldChainSDKV0Native()
-
-        if (sdkLoaded && TokenProvider) {
-          addLog("success", "✅ WorldChain SDK v0 native carregado!")
-          addLog("info", `TokenProvider type: ${typeof TokenProvider}`)
-        } else {
-          addLog("error", "❌ WorldChain SDK v0 native falhou")
-        }
-      } catch (error) {
-        addLog("error", `❌ Erro no SDK v0 native: ${error.message}`)
-      }
-
-      // Test 7: Network connectivity
+      // Test 5: Network connectivity
       addLog("info", "🌐 Testando conectividade WorldChain...")
       try {
         const response = await fetch("https://worldchain-mainnet.g.alchemy.com/public", {
@@ -166,7 +149,7 @@ export default function DebugConsole() {
         addLog("error", `❌ Erro de conectividade: ${error.message}`)
       }
 
-      addLog("success", "🎉 Diagnóstico v0 browser-native completo!")
+      addLog("success", "🎉 Diagnóstico SDK REAL completo!")
     } catch (error) {
       addLog("error", `❌ Erro geral no diagnóstico: ${error.message}`)
     } finally {
@@ -190,14 +173,9 @@ export default function DebugConsole() {
         addLog("info", `Location: ${window.location.href}`)
         addLog("info", `User Agent: ${navigator.userAgent}`)
         addLog("info", `Platform: ${navigator.platform}`)
-      } else if (command === "patch") {
-        const result = testBigNumberBrowserNative()
-        addLog(result ? "success" : "error", `Patch BigNumber V0 Native: ${result ? "✅ OK" : "❌ FALHOU"}`)
-      } else if (command === "globals") {
-        const globalBN = (globalThis as any).BigNumber
-        const windowBN = (window as any).BigNumber
-        const moduleBN = (globalThis as any).__BIGNUMBER_MODULE__
-        addLog("info", `Global: ${typeof globalBN}, Window: ${typeof windowBN}, Module: ${typeof moduleBN}`)
+      } else if (command === "sdk") {
+        const result = testBigNumberReal()
+        addLog(result ? "success" : "error", `SDK REAL test: ${result ? "✅ OK" : "❌ FALHOU"}`)
       } else if (command.startsWith("import ")) {
         const moduleName = command.replace("import ", "")
         try {
@@ -209,7 +187,7 @@ export default function DebugConsole() {
         }
       } else {
         addLog("warn", `Comando não reconhecido: ${command}`)
-        addLog("info", "Comandos: test <nome>, clear, env, patch, globals, import <módulo>")
+        addLog("info", "Comandos: test <nome>, clear, env, sdk, import <módulo>")
       }
     } catch (error) {
       addLog("error", `❌ Erro ao executar comando: ${error.message}`)
@@ -222,17 +200,17 @@ export default function DebugConsole() {
   const runSpecificTest = async (testName: string) => {
     switch (testName) {
       case "bignumber":
-        const result = testBigNumberBrowserNative()
-        addLog(result ? "success" : "error", `BigNumber v0 native test: ${result ? "✅ OK" : "❌ FALHOU"}`)
+        const result = testBigNumberReal()
+        addLog(result ? "success" : "error", `BigNumber test: ${result ? "✅ OK" : "❌ FALHOU"}`)
         break
 
       case "sdk":
         try {
-          const { loadWorldChainSDKV0Native } = await import("@/lib/worldchain-sdk-v0-native")
-          const { sdkLoaded } = await loadWorldChainSDKV0Native()
-          addLog(sdkLoaded ? "success" : "error", `SDK v0 native test: ${sdkLoaded ? "✅ OK" : "❌ FALHOU"}`)
+          const { loadWorldChainSDKReal } = await import("@/lib/worldchain-sdk-real")
+          const { sdkLoaded } = await loadWorldChainSDKReal()
+          addLog(sdkLoaded ? "success" : "error", `SDK REAL test: ${sdkLoaded ? "✅ OK" : "❌ FALHOU"}`)
         } catch (error) {
-          addLog("error", `❌ SDK v0 native test failed: ${error.message}`)
+          addLog("error", `❌ SDK REAL test failed: ${error.message}`)
         }
         break
 
@@ -277,11 +255,11 @@ export default function DebugConsole() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `tpulsefi-debug-v0-native-${Date.now()}.json`
+    a.download = `tpulsefi-debug-sdk-real-${Date.now()}.json`
     a.click()
     URL.revokeObjectURL(url)
 
-    addLog("success", "💾 Logs v0 native exportados")
+    addLog("success", "💾 Logs SDK REAL exportados")
   }
 
   const getLogIcon = (level: LogEntry["level"]) => {
@@ -311,14 +289,14 @@ export default function DebugConsole() {
   }
 
   return (
-    <Card className="bg-gray-900/95 border-2 border-red-500/40 backdrop-blur-xl text-white shadow-2xl shadow-red-500/20 mb-4">
+    <Card className="bg-gray-900/95 border-2 border-green-500/40 backdrop-blur-xl text-white shadow-2xl shadow-green-500/20 mb-4">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Terminal className="w-5 h-5 text-red-400 animate-pulse" />
-            <CardTitle className="text-lg text-red-400">Debug Console V0 Native</CardTitle>
-            <Badge variant="secondary" className="text-xs bg-red-500/20 text-red-400 border-red-500/30">
-              V0-NATIVE
+            <Terminal className="w-5 h-5 text-green-400 animate-pulse" />
+            <CardTitle className="text-lg text-green-400">Debug Console SDK REAL</CardTitle>
+            <Badge variant="secondary" className="text-xs bg-green-500/20 text-green-400 border-green-500/30">
+              HOLDSTATION
             </Badge>
           </div>
 
@@ -369,7 +347,7 @@ export default function DebugConsole() {
           <Button
             onClick={runDiagnostic}
             disabled={isRunning}
-            className="bg-gradient-to-r from-red-500/30 to-red-600/30 border border-red-500/40 hover:from-red-500/50 hover:to-red-600/50 text-xs"
+            className="bg-gradient-to-r from-green-500/30 to-green-600/30 border border-green-500/40 hover:from-green-500/50 hover:to-green-600/50 text-xs"
           >
             {isRunning ? <RefreshCw className="w-3 h-3 animate-spin mr-1" /> : <Play className="w-3 h-3 mr-1" />}
             Diagnóstico
@@ -386,26 +364,26 @@ export default function DebugConsole() {
 
           <Button
             onClick={() => {
-              setCommand("patch")
+              setCommand("sdk")
               runCommand()
             }}
             disabled={isRunning}
             className="bg-gradient-to-r from-green-500/30 to-green-600/30 border border-green-500/40 hover:from-green-500/50 hover:to-green-600/50 text-xs"
           >
             <Bug className="w-3 h-3 mr-1" />
-            Patch
+            SDK
           </Button>
 
           <Button
             onClick={() => {
-              setCommand("globals")
+              setCommand("import @holdstation/worldchain-sdk")
               runCommand()
             }}
             disabled={isRunning}
             className="bg-gradient-to-r from-blue-500/30 to-blue-600/30 border border-blue-500/40 hover:from-blue-500/50 hover:to-blue-600/50 text-xs"
           >
             <Zap className="w-3 h-3 mr-1" />
-            Globals
+            Import
           </Button>
         </div>
 
@@ -414,7 +392,7 @@ export default function DebugConsole() {
           <Textarea
             value={command}
             onChange={(e) => setCommand(e.target.value)}
-            placeholder="Digite um comando (ex: test bignumber, patch, globals, import ethers)"
+            placeholder="Digite um comando (ex: test sdk, import @holdstation/worldchain-sdk)"
             className="bg-gray-800/60 border border-gray-700 text-white placeholder:text-gray-500 resize-none h-10 text-sm font-mono"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
@@ -426,7 +404,7 @@ export default function DebugConsole() {
           <Button
             onClick={runCommand}
             disabled={isRunning || !command.trim()}
-            className="bg-gradient-to-r from-cyan-500/30 to-cyan-600/30 border border-cyan-500/40"
+            className="bg-gradient-to-r from-green-500/30 to-green-600/30 border border-green-500/40"
           >
             <Play className="w-4 h-4" />
           </Button>
@@ -436,7 +414,7 @@ export default function DebugConsole() {
         <div className="bg-black/80 border border-gray-700 rounded-lg p-3 h-64 overflow-y-auto font-mono text-xs">
           {logs.length === 0 ? (
             <div className="text-gray-500 text-center py-8">
-              Console v0 native vazio. Execute um diagnóstico para começar.
+              Console SDK REAL vazio. Execute um diagnóstico para começar.
             </div>
           ) : (
             <div className="space-y-1">
@@ -454,10 +432,10 @@ export default function DebugConsole() {
 
         {/* Status Summary */}
         <div className="mt-4 p-3 rounded-lg bg-gray-800/40 border border-gray-700">
-          <div className="text-xs text-gray-400 mb-2">Status V0 Native:</div>
+          <div className="text-xs text-gray-400 mb-2">Status SDK REAL:</div>
           <div className="flex flex-wrap gap-2">
-            <Badge variant="secondary" className="text-xs bg-blue-500/20 text-blue-400 border-blue-500/30">
-              Console V0 Native Ativo
+            <Badge variant="secondary" className="text-xs bg-green-500/20 text-green-400 border-green-500/30">
+              Console SDK REAL Ativo
             </Badge>
             <Badge variant="secondary" className="text-xs bg-gray-500/20 text-gray-400 border-gray-500/30">
               {logs.length} logs

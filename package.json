@@ -14,6 +14,7 @@
     "test-sdk": "node -e \"try { const sdk = require('@holdstation/worldchain-sdk'); console.log('✅ SDK OK:', Object.keys(sdk)); } catch(e) { console.log('⚠️ Mock mode:', e.message); }\""
   },
   "dependencies": {
+    "@holdstation/worldchain-ethers-v6": "latest",
     "@holdstation/worldchain-sdk": "latest",
     "@radix-ui/react-dialog": "latest",
     "@radix-ui/react-label": "latest",
@@ -21,7 +22,7 @@
     "@radix-ui/react-tabs": "latest",
     "@uniswap/smart-order-router": "latest",
     "@worldcoin/minikit-js": "latest",
-    "async-mutex": "^0.4.0",
+    "async-mutex": "latest",
     "axios": "^1.6.0",
     "bignumber.js": "latest",
     "child_process": "latest",
