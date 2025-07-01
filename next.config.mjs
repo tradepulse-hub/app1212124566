@@ -39,9 +39,8 @@ const nextConfig = {
     // 🔥 PATCH CRÍTICO: Redireciona bignumber.js para nossa versão patchada
     config.resolve.alias = {
       ...config.resolve.alias,
-      'async-mutex': require.resolve('async-mutex'),
-      // 🎯 Esta linha resolve o problema!
-      "bignumber.js$": path.resolve(process.cwd(), "lib/bignumber-patch.ts"),
+      // Redirect bignumber.js to the patched version
+      'bignumber.js$': path.resolve(process.cwd(), 'lib/bignumber-patch.ts'),
     }
 
     // Transpila módulos ES6 para compatibilidade
