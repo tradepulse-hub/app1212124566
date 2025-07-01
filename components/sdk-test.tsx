@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CheckCircle, XCircle, Loader2, TestTube, AlertTriangle, Zap } from "lucide-react"
+import { CheckCircle, XCircle, Loader2, TestTube, Network } from "lucide-react"
 import { useWorldChain } from "./worldchain-provider"
 
 export default function SDKTest() {
@@ -37,12 +37,6 @@ export default function SDKTest() {
           icon: <CheckCircle className="w-4 h-4 text-green-400" />,
           text: "Conectado",
           color: "bg-green-500/20 text-green-400 border-green-500/30",
-        }
-      case "mock":
-        return {
-          icon: <Zap className="w-4 h-4 text-yellow-400" />,
-          text: "Modo Demo",
-          color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
         }
       case "error":
         return {
@@ -108,6 +102,17 @@ export default function SDKTest() {
             </Badge>
           </div>
 
+          {/* 🔥 NOVO: Multicall3 Test */}
+          <div className="flex items-center justify-between p-2 rounded-lg bg-gray-800/40 border border-gray-700/40">
+            <div className="flex items-center gap-2">
+              {getIcon(dependencyStatus.multicall3)}
+              <span className="text-sm text-gray-300">Multicall3</span>
+            </div>
+            <Badge variant="secondary" className={`text-xs ${getStatusColor(dependencyStatus.multicall3)}`}>
+              {getStatus(dependencyStatus.multicall3)}
+            </Badge>
+          </div>
+
           {/* Overall Status */}
           <div className="mt-4 p-3 rounded-lg border-2 border-dashed">
             {allDepsOK && connectionStatus === "connected" ? (
@@ -115,28 +120,30 @@ export default function SDKTest() {
                 <CheckCircle className="w-5 h-5" />
                 <div>
                   <div className="font-medium">Sistema Completo Ativo!</div>
-                  <div className="text-xs text-green-300">TPulseFi conectado ao WorldChain real</div>
+                  <div className="text-xs text-green-300">Holdstation SDK + Multicall3 funcionando</div>
                 </div>
               </div>
             ) : (
               <div className="flex items-center gap-2 text-yellow-400 border-yellow-500/30 bg-yellow-500/10">
-                <Zap className="w-5 h-5 animate-pulse" />
+                <Network className="w-5 h-5 animate-pulse" />
                 <div>
-                  <div className="font-medium">Modo Demo TPulseFi</div>
-                  <div className="text-xs text-yellow-300">Funciona perfeitamente com dados simulados do TPulseFi</div>
+                  <div className="font-medium">Configurando Sistema...</div>
+                  <div className="text-xs text-yellow-300">
+                    {!dependencyStatus.multicall3 ? "Configurando Multicall3..." : "Inicializando..."}
+                  </div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Instructions */}
-          {!allDepsOK && (
+          {/* Multicall3 Info */}
+          {dependencyStatus.multicall3 && (
             <div className="mt-3 p-2 rounded-lg bg-blue-500/10 border border-blue-500/30">
               <div className="flex items-center gap-2 text-blue-400">
-                <AlertTriangle className="w-4 h-4" />
+                <Network className="w-4 h-4" />
                 <div className="text-xs">
-                  <div className="font-medium">Para ativar modo completo:</div>
-                  <div className="mt-1 font-mono text-blue-300">npm run install-missing</div>
+                  <div className="font-medium">Multicall3 Ativo</div>
+                  <div className="mt-1 font-mono text-blue-300">0xcA11...CA11</div>
                 </div>
               </div>
             </div>
