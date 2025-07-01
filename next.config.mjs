@@ -1,16 +1,19 @@
+import path from "path"
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Configurações para compatibilidade com Node.js 16
+  // Configurações para compatibilidade
   experimental: {
     esmExternals: false,
     serverComponentsExternalPackages: [
       '@holdstation/worldchain-sdk',
       'async-mutex',
       'ethers',
+      'bignumber.js'
     ],
   },
   
-  // Configurações para WebPack
+  // Configurações críticas do WebPack
   webpack: (config, { isServer }) => {
     // Resolve problemas com módulos Node.js no browser
     if (!isServer) {
@@ -31,12 +34,21 @@ const nextConfig = {
       }
     }
 
-    // Configurações para async-mutex e outras dependências
+    // 🔥 PATCH CRÍTICO: Redireciona bignumber.js para nossa versão patchada
     config.resolve.alias = {
       ...config.resolve.alias,
       'async-mutex': require.resolve('async-mutex'),
-      "bignumber.js$": path.resolve(__dirname, "lib/bignumber-patched.ts"),
+      // 🎯 Esta linha resolve o problema!
+      "bignumber.js$": path.resolve(process.cwd(), "lib/bignumber-patch.ts"),
     }
+
+    // Transpila módulos ES6 para compatibilidade
+    config.module.rules.push({
+      test: /\.m?js$/,
+      resolve: {
+        fullySpecified: false,
+      },
+    })
 
     return config
   },

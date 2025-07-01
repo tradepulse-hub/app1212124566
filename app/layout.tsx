@@ -2,10 +2,11 @@ import type React from "react"
 import type { Metadata } from "next"
 import "./globals.css"
 import { WorldChainProvider } from "@/components/worldchain-provider"
+import { MiniKitProvider } from "@/components/minikit-provider"
 
 export const metadata: Metadata = {
-  title: "v0 App",
-  description: "Created with v0",
+  title: "TPulseFi Wallet - WorldChain DeFi",
+  description: "The Future of DeFi on WorldChain - TPulseFi Wallet",
   generator: "v0.dev",
 }
 
@@ -17,7 +18,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <WorldChainProvider>{children}</WorldChainProvider>
+        <MiniKitProvider>
+          <WorldChainProvider>{children}</WorldChainProvider>
+        </MiniKitProvider>
       </body>
     </html>
   )
