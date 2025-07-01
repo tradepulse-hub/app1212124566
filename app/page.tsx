@@ -36,7 +36,7 @@ import DebugConsole from "@/components/debug-console"
 import WalletConnect from "@/components/wallet-connect"
 
 import { useWorldChain } from "@/components/worldchain-provider"
-import { formatUnits } from "ethers"
+import { formatUnits } from "@/lib/ethers-format"
 
 export default function TPulseFiWallet() {
   /* ------------------------------------------------------------------ */

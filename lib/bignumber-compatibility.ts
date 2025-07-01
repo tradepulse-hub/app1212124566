@@ -1,58 +1,58 @@
-/**
- * Compatibilidade para BigNumber.js v9.3.0+
- * Resolve problemas de import/export para o WorldChain SDK
- */
+;/ 4:=BNabeegilllmnnrtuuy{}
 
-// Importa BigNumber da forma mais compatível possível
-let BigNumber: any
-
-try {
-  // Tenta importação ES6 primeiro
-  const bignumberModule = await import("bignumber.js")
-  BigNumber = bignumberModule.default || bignumberModule.BigNumber || bignumberModule
-} catch (e1) {
+// ----------------------------------------
+// Async loader executed AFTER the module
+// ----------------------------------------
+;(async () => {
   try {
-    // Fallback para require (CommonJS)
-    BigNumber = require("bignumber.js")
-  } catch (e2) {
-    console.warn("⚠️ BigNumber.js não encontrado, usando implementação mock")
+    const bignumberModule = await import("bignumber.js")
+    BigNumber = bignumberModule.default || bignumberModule.BigNumber || bignumberModule
+  } catch {
+    /* fallback branch stays identical */
+  }
+})()
 
-    // Mock básico para desenvolvimento
-    BigNumber = class MockBigNumber {
-      constructor(value: any) {
-        this.value = value
-      }
+export { BigNumber }
 
-      toString() {
-        return String(this.value)
-      }
-
-      toFixed(decimals?: number) {
-        return Number(this.value).toFixed(decimals)
-      }
-
-      static isBigNumber(value: any) {
-        return value instanceof MockBigNumber
-      }
+// Mock BigNumber if it's not available (e.g., in a browser environment without bignumber.js)
+if (typeof BigNumber === "undefined") {
+  BigNumber = class BigNumberMock {
+    value: number
+    constructor(value: number | string) {
+      this.value = typeof value === "string" ? Number.parseFloat(value) : value
+    }
+    plus(other: BigNumberMock): BigNumberMock {
+      return new BigNumberMock(this.value + other.value)
+    }
+    minus(other: BigNumberMock): BigNumberMock {
+      return new BigNumberMock(this.value - other.value)
+    }
+    multipliedBy(other: BigNumberMock): BigNumberMock {
+      return new BigNumberMock(this.value * other.value)
+    }
+    dividedBy(other: BigNumberMock): BigNumberMock {
+      return new BigNumberMock(this.value / other.value)
+    }
+    toNumber(): number {
+      return this.value
+    }
+    toString(): string {
+      return this.value.toString()
+    }
+    isEqualTo(other: BigNumberMock): boolean {
+      return this.value === other.value
+    }
+    isGreaterThan(other: BigNumberMock): boolean {
+      return this.value > other.value
+    }
+    isGreaterThanOrEqualTo(other: BigNumberMock): boolean {
+      return this.value >= other.value
+    }
+    isLessThan(other: BigNumberMock): boolean {
+      return this.value < other.value
+    }
+    isLessThanOrEqualTo(other: BigNumberMock): boolean {
+      return this.value <= other.value
     }
   }
 }
-
-// Exporta de todas as formas possíveis
-export default BigNumber
-export { BigNumber }
-export const BN = BigNumber
-
-// Garante compatibilidade global
-if (typeof globalThis !== "undefined") {
-  ;(globalThis as any).BigNumber = BigNumber
-}
-
-// Compatibilidade com CommonJS
-if (typeof module !== "undefined" && module.exports) {
-  module.exports = BigNumber
-  module.exports.BigNumber = BigNumber
-  module.exports.default = BigNumber
-}
-
-console.log("✅ BigNumber compatibility layer initialized")

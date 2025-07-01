@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { RefreshCw, Wallet, ExternalLink, Zap, AlertTriangle, Search } from "lucide-react"
-import { formatUnits } from "ethers"
+import { formatUnits } from "@/lib/ethers-format"
 import { useWorldChain } from "./worldchain-provider"
 
 interface TokenBalanceCardProps {
