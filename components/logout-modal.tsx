@@ -10,11 +10,40 @@ interface LogoutModalProps {
 }
 
 export default function LogoutModal({ open, onOpenChange }: LogoutModalProps) {
-  const handleLogout = () => {
-    // Implementar lógica de logout
-    console.log("Fazendo logout...")
-    onOpenChange(false)
-    // Aqui você redirecionaria para a tela de login
+  const handleLogout = async () => {
+    try {
+      console.log("🚪 Iniciando processo de logout...")
+
+      // Chama a API de logout
+      const response = await fetch("/api/auth/logout", {
+        method: "POST",
+      })
+
+      if (response.ok) {
+        console.log("✅ Logout API bem-sucedido")
+      } else {
+        console.warn("⚠️ Logout API falhou, mas continuando...")
+      }
+
+      // Limpa localStorage
+      if (typeof window !== "undefined") {
+        localStorage.clear()
+        sessionStorage.clear()
+        console.log("🧹 Storage limpo")
+      }
+
+      // Fecha o modal
+      onOpenChange(false)
+
+      // Força reload da página para garantir limpeza completa
+      console.log("🔄 Recarregando página...")
+      window.location.reload()
+    } catch (error) {
+      console.error("❌ Erro no logout:", error)
+      // Mesmo com erro, força reload
+      onOpenChange(false)
+      window.location.reload()
+    }
   }
 
   return (

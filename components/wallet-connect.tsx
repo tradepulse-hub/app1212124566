@@ -130,19 +130,47 @@ export default function WalletConnect({ onLoginSuccess, onLogout }: WalletConnec
       setLoading(true)
       console.log("🚪 Fazendo logout TPulseFi...")
 
+      // Chama a API de logout
       const response = await fetch("/api/auth/logout", {
         method: "POST",
       })
 
       if (response.ok) {
         console.log("✅ Logout TPulseFi bem-sucedido")
-        setUser(null)
-        if (onLogout) {
-          onLogout()
-        }
+      } else {
+        console.warn("⚠️ Logout API falhou, mas continuando...")
       }
+
+      // Limpa estado local
+      setUser(null)
+
+      // Chama callback de logout
+      if (onLogout) {
+        onLogout()
+      }
+
+      // Limpa storage
+      if (typeof window !== "undefined") {
+        localStorage.clear()
+        sessionStorage.clear()
+        console.log("🧹 Storage limpo")
+      }
+
+      // Força reload para garantir limpeza completa
+      console.log("🔄 Recarregando página após logout...")
+      setTimeout(() => {
+        window.location.reload()
+      }, 500)
     } catch (error) {
       console.error("❌ Erro no logout:", error)
+      // Mesmo com erro, limpa estado e recarrega
+      setUser(null)
+      if (onLogout) {
+        onLogout()
+      }
+      setTimeout(() => {
+        window.location.reload()
+      }, 500)
     } finally {
       setLoading(false)
     }

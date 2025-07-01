@@ -214,7 +214,7 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
           console.log("✅ TokenProvider criado sem Multicall3")
         }
 
-        // 🔥 CONFIGURA PARTNER CODE ANTES DE USAR
+        // 🔥 CONFIGURA PARTNER CODE CORRETAMENTE
         console.log("🏷️ Configurando partner code 'tpulsefi'...")
 
         // Aguarda um pouco para garantir que o provider está pronto
@@ -223,45 +223,60 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
         // Tenta várias formas de definir o partner code
         let partnerCodeSet = false
         try {
-          // Método 1: setPartnerCode
+          // Método 1: setPartnerCode (mais comum)
           if (typeof tokenProviderInstance.setPartnerCode === "function") {
-            await tokenProviderInstance.setPartnerCode("tpulsefi")
+            tokenProviderInstance.setPartnerCode("tpulsefi")
             console.log("✅ Partner code definido via setPartnerCode()")
             partnerCodeSet = true
           }
 
-          // Método 2: propriedade direta
-          if (!partnerCodeSet && tokenProviderInstance.partnerCode !== undefined) {
+          // Método 2: Verifica se tem propriedade partnerCode
+          if (!partnerCodeSet && "partnerCode" in tokenProviderInstance) {
             tokenProviderInstance.partnerCode = "tpulsefi"
             console.log("✅ Partner code definido via propriedade")
             partnerCodeSet = true
           }
 
-          // Método 3: config
+          // Método 3: Verifica se tem config
           if (!partnerCodeSet && tokenProviderInstance.config) {
             tokenProviderInstance.config.partnerCode = "tpulsefi"
             console.log("✅ Partner code definido via config")
             partnerCodeSet = true
           }
 
-          // Método 4: forçar no construtor
+          // Método 4: Força definição direta
           if (!partnerCodeSet) {
-            console.log("🔄 Recriando TokenProvider com partner code...")
-            tokenProviderInstance = new TokenProviderClass({
-              provider,
-              client,
-              multicall3: multicall3Works ? multicall3 : undefined,
-              partnerCode: "tpulsefi", // Tenta passar direto no construtor
-            })
-            console.log("✅ TokenProvider recriado com partner code")
-            partnerCodeSet = true
+            console.log("🔄 Forçando definição do partner code...")
+            try {
+              Object.defineProperty(tokenProviderInstance, "partnerCode", {
+                value: "tpulsefi",
+                writable: true,
+                configurable: true,
+              })
+              console.log("✅ Partner code forçado via defineProperty")
+              partnerCodeSet = true
+            } catch (defineError) {
+              console.warn("⚠️ Erro ao forçar partner code:", defineError)
+            }
           }
 
           // Verifica se foi definido
           console.log("🔍 Verificando partner code...")
-          if (tokenProviderInstance.getPartnerCode) {
+          if (typeof tokenProviderInstance.getPartnerCode === "function") {
             const currentPartnerCode = tokenProviderInstance.getPartnerCode()
             console.log("📋 Partner code atual:", currentPartnerCode)
+          }
+
+          // Teste adicional: chama setPartnerCode novamente se ainda não funcionou
+          if (!partnerCodeSet && typeof tokenProviderInstance.setPartnerCode === "function") {
+            console.log("🔄 Tentativa adicional setPartnerCode...")
+            try {
+              await tokenProviderInstance.setPartnerCode("tpulsefi")
+              partnerCodeSet = true
+              console.log("✅ Partner code definido na segunda tentativa")
+            } catch (secondTryError) {
+              console.warn("⚠️ Segunda tentativa falhou:", secondTryError)
+            }
           }
         } catch (partnerError) {
           console.warn("⚠️ Erro ao definir partner code:", partnerError)
@@ -454,7 +469,9 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
   }
 
   const logout = () => {
-    console.log("🚪 Logout TPulseFi")
+    console.log("🚪 Logout TPulseFi - limpando estado completo")
+
+    // Limpa todos os estados
     setUser(null)
     setIsAuthenticated(false)
     setWalletAddress(null)
@@ -462,6 +479,21 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
     setTokenBalances({})
     setTokenDetails({})
     setWalletTokens([])
+    setIsLoadingBalances(false)
+    setIsLoadingTokens(false)
+
+    // Limpa storage se disponível
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.clear()
+        sessionStorage.clear()
+        console.log("🧹 Storage limpo no logout")
+      } catch (storageError) {
+        console.warn("⚠️ Erro ao limpar storage:", storageError)
+      }
+    }
+
+    console.log("✅ Estado TPulseFi limpo completamente")
   }
 
   const value: WorldChainContextType = {
