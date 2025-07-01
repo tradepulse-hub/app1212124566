@@ -117,15 +117,38 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
       let TokenProviderClass: any = null
       let usingMock = false
 
-      if (sdkLoaded && TokenProvider) {
+      if (sdkLoaded && typeof TokenProvider === "function") {
         console.log("✅ Holdstation SDK (hijack) carregado com sucesso")
         TokenProviderClass = TokenProvider
       } else {
         /* ----------------------- FALLBACK PARA MOCK ----------------------- */
-        console.warn("⚠️ SDK oficial falhou - usando mock TokenProvider")
+        console.warn("⚠️ SDK oficial falhou ou não exportou TokenProvider – usando mock")
         const mock = await import("@/lib/mock-worldchain-sdk")
-        TokenProviderClass = mock.TokenProvider
-        usingMock = true
+        if (typeof mock.TokenProvider === "function") {
+          TokenProviderClass = mock.TokenProvider
+          usingMock = true
+        } else {
+          console.error("❌ mock TokenProvider inválido – criação de stub.")
+          TokenProviderClass = class StubTokenProvider {
+            constructor() {
+              console.warn("ℹ️ Usando StubTokenProvider – sem dados reais")
+            }
+            async tokenOf() {
+              return []
+            }
+            async details() {
+              return {}
+            }
+            async balanceOf() {
+              return {}
+            }
+          }
+          usingMock = true
+        }
+      }
+
+      if (typeof TokenProviderClass !== "function") {
+        throw new Error("TokenProviderClass is not a valid constructor")
       }
 
       console.log("🎯 Holdstation SDK carregado com HIJACK TOTAL!")
