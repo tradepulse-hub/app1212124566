@@ -5,13 +5,15 @@ const nextConfig = {
   // Configurações para compatibilidade
   experimental: {
     esmExternals: false,
-    serverComponentsExternalPackages: [
-      '@holdstation/worldchain-sdk',
-      'async-mutex',
-      'ethers',
-      'bignumber.js'
-    ],
   },
+
+  // External packages required by Server Components / Actions
+  serverExternalPackages: [
+    '@holdstation/worldchain-sdk',
+    'async-mutex',
+    'ethers',
+    'bignumber.js',
+  ],
   
   // Configurações críticas do WebPack
   webpack: (config, { isServer }) => {
@@ -52,12 +54,6 @@ const nextConfig = {
 
     return config
   },
-
-  // Transpila módulos ES6 para compatibilidade
-  transpilePackages: [
-    '@holdstation/worldchain-sdk',
-    'async-mutex',
-  ],
 
   // Configurações de runtime
   eslint: {
