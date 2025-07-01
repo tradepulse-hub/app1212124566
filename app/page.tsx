@@ -1,372 +1,270 @@
 "use client"
 
-import { useState, useEffect } from "react"
-
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { useState } from "react"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-
-import {
-  ArrowUpRight,
-  ArrowDownLeft,
-  RefreshCw,
-  Copy,
-  Eye,
-  EyeOff,
-  Wallet,
-  History,
-  Settings,
-  Zap,
-  Menu,
-  LogOut,
-  Search,
-} from "lucide-react"
-
-import SendModal from "@/components/send-modal"
-import ReceiveModal from "@/components/receive-modal"
-import SwapModal from "@/components/swap-modal"
-import LogoutModal from "@/components/logout-modal"
-
-import Sidebar from "@/components/sidebar"
-import TokenBalanceCard from "@/components/token-balance-card"
-import WorldChainStatus from "@/components/worldchain-status"
-import SDKTest from "@/components/sdk-test"
-import DebugConsole from "@/components/debug-console"
-import WalletConnect from "@/components/wallet-connect"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Wallet, Send, ArrowUpDown, Plus, Eye, EyeOff, Copy, ExternalLink, AlertTriangle, Zap } from "lucide-react"
 
 import { useWorldChain } from "@/components/worldchain-provider"
-import { formatUnits } from "@/lib/ethers-format"
+import TokenBalanceCard from "@/components/token-balance-card"
+import SendModal from "@/components/send-modal"
+import SwapModal from "@/components/swap-modal"
+import ReceiveModal from "@/components/receive-modal"
+import TransactionHistory from "@/components/transaction-history"
+import SDKTest from "@/components/sdk-test"
+import DebugConsole from "@/components/debug-console"
 
-export default function TPulseFiWallet() {
-  /* ------------------------------------------------------------------ */
-  /* Local UI state                                                     */
-  /* ------------------------------------------------------------------ */
-  const [activeTab, setActiveTab] = useState("wallet")
-  const [showBalance, setShowBalance] = useState(true)
-
-  const [sendModalOpen, setSendModalOpen] = useState(false)
-  const [receiveModalOpen, setReceiveModalOpen] = useState(false)
-  const [swapModalOpen, setSwapModalOpen] = useState(false)
-  const [logoutModalOpen, setLogoutModalOpen] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-
-  const [scanLines, setScanLines] = useState(0)
-
-  /* ------------------------------------------------------------------ */
-  /* Global state from WorldChain context                               */
-  /* ------------------------------------------------------------------ */
+export default function WalletDashboard() {
   const {
-    tokenBalances,
+    isSDKLoaded,
+    isConnected,
+    walletAddress,
+    sdkError,
     tokenDetails,
+    tokenBalances,
     walletTokens,
-    isLoadingBalances,
+    popularTokens,
+    connectWallet,
+    disconnectWallet,
+    refreshTokenData,
     isLoadingTokens,
-    refreshBalances,
-    refreshWalletTokens,
-    connectionStatus,
-    user,
-    isAuthenticated,
-    login,
-    logout,
+    isLoadingBalances,
   } = useWorldChain()
 
-  /* ------------------------------------------------------------------ */
-  /* Calculate real token amounts (no USD values)                       */
-  /* ------------------------------------------------------------------ */
-  const calculateTokenAmounts = () => {
-    let totalTokens = 0
-    let tpfAmount = 0
+  const [showBalance, setShowBalance] = useState(true)
+  const [sendModalOpen, setSendModalOpen] = useState(false)
+  const [swapModalOpen, setSwapModalOpen] = useState(false)
+  const [receiveModalOpen, setReceiveModalOpen] = useState(false)
 
-    walletTokens.forEach((tokenAddress) => {
-      const balance = tokenBalances[tokenAddress]
-      const details = tokenDetails[tokenAddress]
+  // Mock wallet connection for demo
+  const handleConnect = () => {
+    if (!isSDKLoaded) {
+      alert("SDK não carregado. Instale as dependências necessárias.")
+      return
+    }
+    const mockAddress = "0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6"
+    connectWallet(mockAddress)
+  }
 
-      if (balance && balance !== "0" && details) {
-        totalTokens++
+  const copyAddress = () => {
+    if (walletAddress) {
+      navigator.clipboard.writeText(walletAddress)
+    }
+  }
 
-        // Se for TPF, calcula a quantidade
-        if (details.symbol === "TPF") {
-          try {
-            const formatted = formatUnits(balance, details.decimals)
-            tpfAmount = Number.parseFloat(formatted)
-          } catch (error) {
-            console.error("Erro ao calcular TPF:", error)
-          }
+  const formatAddress = (address: string) => {
+    return `${address.slice(0, 6)}...${address.slice(-4)}`
+  }
+
+  const getTotalBalance = () => {
+    if (!isConnected || Object.keys(tokenBalances).length === 0) return "0.00"
+
+    // Simplified calculation - in real app would use actual prices
+    let total = 0
+    Object.entries(tokenBalances).forEach(([address, balance]) => {
+      const token = tokenDetails[address]
+      if (token && balance !== "0") {
+        // Mock prices for demo
+        const mockPrices: Record<string, number> = {
+          WETH: 2500,
+          USDCe: 1,
+          USDT: 1,
+          DAI: 1,
         }
+        const price = mockPrices[token.symbol] || 0
+        const amount = Number.parseFloat(balance) / Math.pow(10, token.decimals)
+        total += amount * price
       }
     })
 
-    return { totalTokens, tpfAmount }
+    return total.toFixed(2)
   }
 
-  const { totalTokens, tpfAmount } = calculateTokenAmounts()
-
-  /* ------------------------------------------------------------------ */
-  /* Matrix-style scan-line animation                                   */
-  /* ------------------------------------------------------------------ */
-  useEffect(() => {
-    const id = setInterval(() => {
-      setScanLines((prev) => (prev + 1) % 100)
-    }, 100)
-    return () => clearInterval(id)
-  }, [])
-
-  /* ------------------------------------------------------------------ */
-  /* If NOT authenticated, we show only the login screen                */
-  /* ------------------------------------------------------------------ */
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-black text-white overflow-hidden relative">
-        {/* --- Animated backgrounds & scan lines (kept lightweight) --- */}
-        <div className="fixed inset-0 bg-gradient-to-br from-purple-900/30 via-black to-cyan-900/30 animate-pulse" />
-        <div className="fixed inset-0 opacity-20">
-          <div
-            className="absolute w-full h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent animate-pulse"
-            style={{ top: `${scanLines}%`, transition: "top 0.1s linear" }}
-          />
-        </div>
-
-        <div className="relative z-10 p-4 max-w-sm mx-auto">
-          {/* ---- Logo ---- */}
-          <div className="mb-6 text-center">
-            <div className="mx-auto w-12 h-12 bg-gradient-to-r from-cyan-400 to-purple-500 rounded-full flex items-center justify-center shadow-lg shadow-cyan-500/50 animate-pulse">
-              <Zap className="w-6 h-6 text-white" />
-            </div>
-            <h1 className="mt-4 text-2xl font-bold bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-              TPulseFi Wallet
-            </h1>
-            <p className="text-gray-400 text-sm mt-1">Real Tokens via Holdstation SDK</p>
-          </div>
-
-          {/* ---- Status, debug & SDK tests (same as full UI) ---- */}
-          <WorldChainStatus />
-          <DebugConsole />
-          {connectionStatus !== "connected" && <SDKTest />}
-
-          {/* ---- Connect Wallet component ---- */}
-          <WalletConnect onLoginSuccess={login} onLogout={logout} />
-        </div>
-      </div>
-    )
-  }
-
-  /* ------------------------------------------------------------------ */
-  /* MAIN AUTHENTICATED WALLET UI                                       */
-  /* ------------------------------------------------------------------ */
   return (
-    <div className="min-h-screen bg-black text-white overflow-hidden relative">
-      {/* -------- Cosmetic animated background -------- */}
-      <div className="fixed inset-0 bg-gradient-to-br from-purple-900/30 via-black to-cyan-900/30 animate-pulse" />
-      <div className="fixed inset-0 opacity-20">
-        <div
-          className="absolute w-full h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent animate-pulse"
-          style={{ top: `${scanLines}%`, transition: "top 0.1s linear" }}
-        />
-      </div>
-
-      {/* -------- Sidebar & backdrop -------- */}
-      <Sidebar open={sidebarOpen} onOpenChange={setSidebarOpen} />
-      {sidebarOpen && (
-        <div onClick={() => setSidebarOpen(false)} className="fixed inset-0 bg-black/60 backdrop-blur-md z-40" />
-      )}
-
-      {/* -------- Main wrapper -------- */}
-      <div className="relative z-10 p-4 max-w-sm mx-auto">
-        {/* --------------- Header --------------- */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSidebarOpen(true)}
-              className="text-cyan-400 hover:bg-cyan-500/20 hover:scale-110 transition"
-            >
-              <Menu className="w-5 h-5" />
-            </Button>
-
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-cyan-400 to-purple-500 rounded-full flex items-center justify-center shadow-lg shadow-cyan-500/50 animate-pulse">
-                <Zap className="w-4 h-4 text-white" />
-              </div>
-              <h1 className="text-lg font-bold bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                TPulseFi
-              </h1>
-            </div>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setLogoutModalOpen(true)}
-              className="text-red-400 hover:bg-red-500/20 hover:scale-110 transition"
-            >
-              <LogOut className="w-4 h-4" />
-            </Button>
-          </div>
-
-          {/* Connected wallet badge */}
-          {user?.walletAddress && (
-            <div className="p-2 rounded-lg bg-green-500/10 border border-green-500/30 flex items-center gap-2">
-              <Wallet className="w-4 h-4 text-green-400" />
-              <span className="text-xs font-mono">
-                {user.walletAddress.slice(0, 6)}…{user.walletAddress.slice(-4)}
-              </span>
-              <Badge variant="secondary" className="bg-green-500/20 text-green-400 border-green-500/30">
-                CONNECTED
-              </Badge>
-            </div>
-          )}
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 p-4">
+      <div className="max-w-md mx-auto space-y-4">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+            TPulseFi Wallet
+          </h1>
+          <p className="text-gray-400 text-sm">WorldChain DeFi Wallet</p>
         </div>
 
-        {/* --------------- Global status & debug --------------- */}
-        <WorldChainStatus />
-        <DebugConsole />
-        {connectionStatus !== "connected" && <SDKTest />}
+        {/* SDK Status Alert */}
+        {!isSDKLoaded && (
+          <Alert className="border-red-500/30 bg-red-500/10">
+            <AlertTriangle className="h-4 w-4 text-red-500" />
+            <AlertDescription className="text-red-400">
+              <strong>SDK Indisponível:</strong> {sdkError || "Dependências não carregadas"}
+              <br />
+              <span className="text-xs">Funcionalidades limitadas até resolver as dependências.</span>
+            </AlertDescription>
+          </Alert>
+        )}
 
-        {/* --------------- Main Tabs --------------- */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid grid-cols-3 mb-6">
-            <TabsTrigger value="wallet">
-              <Wallet className="w-4 h-4" />
-            </TabsTrigger>
-            <TabsTrigger value="history">
-              <History className="w-4 h-4" />
-            </TabsTrigger>
-            <TabsTrigger value="settings">
-              <Settings className="w-4 h-4" />
-            </TabsTrigger>
-          </TabsList>
-
-          {/* ---------- WALLET TAB ---------- */}
-          <TabsContent value="wallet" className="space-y-4">
-            {/* Balance card - REAL QUANTITIES ONLY */}
-            <Card>
-              <CardHeader>
+        {/* Connection Status */}
+        {!isConnected ? (
+          <Card className="bg-gray-900/70 border-2 border-purple-500/30 backdrop-blur-sm">
+            <CardContent className="p-6 text-center">
+              <Wallet className="w-12 h-12 text-purple-400 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-white mb-2">Conectar Carteira</h2>
+              <p className="text-gray-400 mb-4">Conecte sua carteira para começar</p>
+              <Button
+                onClick={handleConnect}
+                disabled={!isSDKLoaded}
+                className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+              >
+                <Wallet className="w-4 h-4 mr-2" />
+                {isSDKLoaded ? "Conectar Carteira" : "SDK Indisponível"}
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {/* Wallet Info */}
+            <Card className="bg-gray-900/70 border-2 border-purple-500/30 backdrop-blur-sm">
+              <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm">Tokens Reais</CardTitle>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={refreshWalletTokens}
-                      disabled={isLoadingTokens}
-                      className="h-8 w-8 text-purple-400 hover:bg-purple-500/20"
-                    >
-                      <Search className={`w-4 h-4 ${isLoadingTokens ? "animate-spin" : ""}`} />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => setShowBalance((v) => !v)}>
-                      {showBalance ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {showBalance
-                    ? tpfAmount > 0
-                      ? tpfAmount.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 4,
-                        })
-                      : "0.00"
-                    : "••••••••"}
-                </div>
-                <div className="text-xs text-gray-400">TPF (Quantidade Real)</div>
-                <div className="text-sm text-cyan-400 mt-1">
-                  {totalTokens} tokens com saldo • {walletTokens.length} contratos
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Quick actions */}
-            <div className="grid grid-cols-3 gap-3">
-              <Button onClick={() => setSendModalOpen(true)} className="h-16 flex flex-col gap-1">
-                <ArrowUpRight className="w-5 h-5" />
-                <span className="text-xs">Enviar</span>
-              </Button>
-              <Button onClick={() => setReceiveModalOpen(true)} className="h-16 flex flex-col gap-1">
-                <ArrowDownLeft className="w-5 h-5" />
-                <span className="text-xs">Receber</span>
-              </Button>
-              <Button onClick={() => setSwapModalOpen(true)} className="h-16 flex flex-col gap-1">
-                <RefreshCw className="w-5 h-5" />
-                <span className="text-xs">Swap</span>
-              </Button>
-            </div>
-
-            {/* Real blockchain stats */}
-            <div className="grid grid-cols-2 gap-3">
-              <Card>
-                <CardContent className="p-3">
-                  <div className="text-xs text-gray-400">Tokens Únicos</div>
-                  <div className="text-lg font-bold text-cyan-400">{walletTokens.length}</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-3">
-                  <div className="text-xs text-gray-400">Com Saldo</div>
-                  <div className="text-lg font-bold text-green-400">{totalTokens}</div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Token balances - REAL QUANTITIES */}
-            <TokenBalanceCard tokenBalances={tokenBalances} isLoading={isLoadingBalances} onRefresh={refreshBalances} />
-          </TabsContent>
-
-          {/* ---------- HISTORY TAB ---------- */}
-          <TabsContent value="history">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Histórico</CardTitle>
-                <CardDescription>Transações reais da blockchain</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-400 text-sm">Histórico real será implementado em breve.</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* ---------- SETTINGS TAB ---------- */}
-          <TabsContent value="settings">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Configurações</CardTitle>
-                <CardDescription>Gerencie sua carteira</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/40">
-                    <div>
-                      <h3 className="text-sm text-gray-300">Endereço</h3>
-                      <p className="text-xs text-gray-500">{user.walletAddress}</p>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                      <Wallet className="w-4 h-4 text-white" />
                     </div>
-                    <Button variant="ghost" size="icon">
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/40">
                     <div>
-                      <h3 className="text-sm text-gray-300">Tokens Encontrados</h3>
-                      <p className="text-xs text-gray-500">{walletTokens.length} contratos únicos</p>
+                      <p className="text-sm text-gray-400">Carteira Conectada</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-white font-mono text-sm">{formatAddress(walletAddress!)}</p>
+                        <Button variant="ghost" size="sm" onClick={copyAddress} className="h-6 w-6 p-0">
+                          <Copy className="w-3 h-3" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                          <ExternalLink className="w-3 h-3" />
+                        </Button>
+                      </div>
                     </div>
-                    <Badge variant="secondary" className="bg-cyan-500/20 text-cyan-400 border-cyan-500/30">
-                      REAL
-                    </Badge>
                   </div>
+                  <Button variant="ghost" size="sm" onClick={disconnectWallet}>
+                    Desconectar
+                  </Button>
+                </div>
+              </CardHeader>
+
+              <CardContent>
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="text-sm text-gray-400">Saldo Total</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-2xl font-bold text-white">
+                        {showBalance ? `$${getTotalBalance()}` : "••••••"}
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowBalance(!showBalance)}
+                        className="h-6 w-6 p-0"
+                      >
+                        {showBalance ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                    <Zap className="w-3 h-3 mr-1" />
+                    WorldChain
+                  </Badge>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="grid grid-cols-3 gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setSendModalOpen(true)}
+                    className="flex flex-col gap-1 h-16 border-purple-500/30 hover:bg-purple-500/20"
+                  >
+                    <Send className="w-4 h-4" />
+                    <span className="text-xs">Enviar</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setReceiveModalOpen(true)}
+                    className="flex flex-col gap-1 h-16 border-purple-500/30 hover:bg-purple-500/20"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span className="text-xs">Receber</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setSwapModalOpen(true)}
+                    className="flex flex-col gap-1 h-16 border-purple-500/30 hover:bg-purple-500/20"
+                  >
+                    <ArrowUpDown className="w-4 h-4" />
+                    <span className="text-xs">Swap</span>
+                  </Button>
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
-        </Tabs>
+
+            {/* Main Content */}
+            <Tabs defaultValue="tokens" className="w-full">
+              <TabsList className="grid w-full grid-cols-3 bg-gray-800/50">
+                <TabsTrigger value="tokens">Tokens</TabsTrigger>
+                <TabsTrigger value="history">Histórico</TabsTrigger>
+                <TabsTrigger value="settings">Config</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="tokens" className="space-y-4">
+                {/* Token Balances */}
+                <div className="space-y-2">
+                  {isLoadingTokens || isLoadingBalances ? (
+                    <Card className="bg-gray-900/70 border-2 border-purple-500/30 backdrop-blur-sm">
+                      <CardContent className="p-4 text-center">
+                        <div className="animate-spin w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full mx-auto mb-2" />
+                        <p className="text-gray-400 text-sm">Carregando tokens...</p>
+                      </CardContent>
+                    </Card>
+                  ) : Object.keys(tokenDetails).length === 0 ? (
+                    <Card className="bg-gray-900/70 border-2 border-purple-500/30 backdrop-blur-sm">
+                      <CardContent className="p-4 text-center">
+                        <p className="text-gray-400">Nenhum token encontrado</p>
+                        <Button variant="ghost" size="sm" onClick={refreshTokenData} className="mt-2">
+                          Atualizar
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    Object.entries(tokenDetails).map(([address, token]) => (
+                      <TokenBalanceCard
+                        key={address}
+                        token={token}
+                        balance={tokenBalances[address] || "0"}
+                        showBalance={showBalance}
+                      />
+                    ))
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="history">
+                <TransactionHistory />
+              </TabsContent>
+
+              <TabsContent value="settings" className="space-y-4">
+                <SDKTest />
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
+
+        {/* Modals */}
+        <SendModal open={sendModalOpen} onOpenChange={setSendModalOpen} />
+        <SwapModal open={swapModalOpen} onOpenChange={setSwapModalOpen} />
+        <ReceiveModal open={receiveModalOpen} onOpenChange={setReceiveModalOpen} />
+
+        {/* Debug Console */}
+        <DebugConsole />
       </div>
-
-      {/* -------- Modals -------- */}
-      <SendModal open={sendModalOpen} onOpenChange={setSendModalOpen} />
-      <ReceiveModal open={receiveModalOpen} onOpenChange={setReceiveModalOpen} />
-      <SwapModal open={swapModalOpen} onOpenChange={setSwapModalOpen} />
-      <LogoutModal open={logoutModalOpen} onOpenChange={setLogoutModalOpen} />
     </div>
   )
 }

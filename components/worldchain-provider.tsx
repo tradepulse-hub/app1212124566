@@ -44,6 +44,7 @@ interface WorldChainContextType {
   isSDKLoaded: boolean
   isConnected: boolean
   walletAddress: string | null
+  sdkError: string | null
 
   // Token Data
   tokenDetails: Record<string, TokenDetails>
@@ -93,6 +94,7 @@ export function WorldChainProvider({ children }: { children: React.ReactNode }) 
   const [isSDKLoaded, setIsSDKLoaded] = useState(false)
   const [isConnected, setIsConnected] = useState(false)
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
+  const [sdkError, setSdkError] = useState<string | null>(null)
   const [tokenDetails, setTokenDetails] = useState<Record<string, TokenDetails>>({})
   const [tokenBalances, setTokenBalances] = useState<Record<string, string>>({})
   const [walletTokens, setWalletTokens] = useState<string[]>([])
@@ -129,29 +131,35 @@ export function WorldChainProvider({ children }: { children: React.ReactNode }) 
       if (result.sdkLoaded) {
         setIsSDKLoaded(true)
         setPopularTokens(getPopularTokens())
+        setSdkError(null)
         console.log("✅ WorldChain SDK carregado com sucesso!")
       } else {
-        console.error("❌ Falha ao carregar WorldChain SDK")
-        // Mesmo assim marca como carregado para usar mock
-        setIsSDKLoaded(true)
-        setPopularTokens(getPopularTokens())
+        setIsSDKLoaded(false)
+        setSdkError(result.error || "Falha ao carregar SDK")
+        console.error("❌ Falha ao carregar WorldChain SDK:", result.error)
       }
     } catch (error) {
       console.error("❌ Erro ao carregar SDK:", error)
-      // Marca como carregado para usar mock
-      setIsSDKLoaded(true)
-      setPopularTokens(getPopularTokens())
+      setIsSDKLoaded(false)
+      setSdkError((error as Error).message)
     }
   }
 
-  const connectWallet = useCallback((address: string) => {
-    console.log("🔗 Conectando carteira:", address)
-    setWalletAddress(address)
-    setIsConnected(true)
+  const connectWallet = useCallback(
+    (address: string) => {
+      if (!isSDKLoaded) {
+        throw new Error("SDK não carregado")
+      }
 
-    // Carrega dados da carteira
-    refreshTokenData()
-  }, [])
+      console.log("🔗 Conectando carteira:", address)
+      setWalletAddress(address)
+      setIsConnected(true)
+
+      // Carrega dados da carteira
+      refreshTokenData()
+    },
+    [isSDKLoaded],
+  )
 
   const disconnectWallet = useCallback(() => {
     console.log("🔌 Desconectando carteira")
@@ -165,7 +173,9 @@ export function WorldChainProvider({ children }: { children: React.ReactNode }) 
   }, [])
 
   const refreshTokenData = useCallback(async () => {
-    if (!walletAddress || !isSDKLoaded) return
+    if (!walletAddress || !isSDKLoaded) {
+      throw new Error("SDK não carregado ou carteira não conectada")
+    }
 
     setIsLoadingTokens(true)
     setIsLoadingBalances(true)
@@ -201,18 +211,7 @@ export function WorldChainProvider({ children }: { children: React.ReactNode }) 
       }
     } catch (error) {
       console.error("❌ Erro ao atualizar dados dos tokens:", error)
-      // Em caso de erro, usa dados mock
-      setWalletTokens([popularTokens[0]?.address, popularTokens[1]?.address].filter(Boolean))
-      const mockDetails: Record<string, TokenDetails> = {}
-      const mockBalances: Record<string, string> = {}
-
-      popularTokens.slice(0, 2).forEach((token) => {
-        mockDetails[token.address] = token
-        mockBalances[token.address] = "1000000000000000000" // 1 token
-      })
-
-      setTokenDetails(mockDetails)
-      setTokenBalances(mockBalances)
+      throw error
     } finally {
       setIsLoadingTokens(false)
       setIsLoadingBalances(false)
@@ -239,6 +238,7 @@ export function WorldChainProvider({ children }: { children: React.ReactNode }) 
       }
     } catch (error) {
       console.error("❌ Erro ao iniciar monitoramento:", error)
+      throw error
     }
   }, [walletAddress, isSDKLoaded, historyWatcher])
 
@@ -253,7 +253,9 @@ export function WorldChainProvider({ children }: { children: React.ReactNode }) 
   }, [historyWatcher])
 
   const refreshHistory = useCallback(async () => {
-    if (!walletAddress || !isSDKLoaded) return
+    if (!walletAddress || !isSDKLoaded) {
+      throw new Error("SDK não carregado ou carteira não conectada")
+    }
 
     setIsLoadingHistory(true)
     try {
@@ -263,11 +265,12 @@ export function WorldChainProvider({ children }: { children: React.ReactNode }) 
       if (result.success) {
         setTransactionHistory(result.transactions)
         console.log("✅ Histórico atualizado:", result.transactions.length, "transações")
+      } else {
+        throw new Error(result.error)
       }
     } catch (error) {
       console.error("❌ Erro ao atualizar histórico:", error)
-      // Em caso de erro, usa histórico vazio
-      setTransactionHistory([])
+      throw error
     } finally {
       setIsLoadingHistory(false)
     }
@@ -409,6 +412,7 @@ export function WorldChainProvider({ children }: { children: React.ReactNode }) 
     isSDKLoaded,
     isConnected,
     walletAddress,
+    sdkError,
 
     // Token Data
     tokenDetails,
