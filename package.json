@@ -16,6 +16,7 @@
   "dependencies": {
     "@holdstation/worldchain-sdk": "latest",
     "@radix-ui/react-dialog": "latest",
+    "@radix-ui/react-label": "latest",
     "@radix-ui/react-select": "latest",
     "@radix-ui/react-tabs": "latest",
     "@uniswap/smart-order-router": "latest",
