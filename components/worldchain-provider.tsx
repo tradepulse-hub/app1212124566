@@ -7,15 +7,25 @@ import { loadWorldChainSDKV0Native, testBigNumberBrowserNative } from "@/lib/wor
 
 let ethers: any = null
 
+interface TokenDetails {
+  address: string
+  chainId: number
+  decimals: number
+  symbol: string
+  name: string
+}
+
 interface WorldChainContextType {
   tokenProvider: any | null
   isConnected: boolean
   walletAddress: string | null
   tokenBalances: Record<string, string>
+  tokenDetails: Record<string, TokenDetails>
+  walletTokens: string[]
   isLoadingBalances: boolean
+  isLoadingTokens: boolean
   refreshBalances: () => Promise<void>
-  getTokenDetails: (tokens: string[]) => Promise<any>
-  getWalletTokens: (wallet: string) => Promise<string[]>
+  refreshWalletTokens: () => Promise<void>
   sdkLoaded: boolean
   connectionStatus: "loading" | "connected" | "error"
   dependencyStatus: {
@@ -49,7 +59,10 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
   const [isConnected, setIsConnected] = useState(false)
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
   const [tokenBalances, setTokenBalances] = useState<Record<string, string>>({})
+  const [tokenDetails, setTokenDetails] = useState<Record<string, TokenDetails>>({})
+  const [walletTokens, setWalletTokens] = useState<string[]>([])
   const [isLoadingBalances, setIsLoadingBalances] = useState(false)
+  const [isLoadingTokens, setIsLoadingTokens] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState<"loading" | "connected" | "error">("loading")
   const [dependencyStatus, setDependencyStatus] = useState({
     ethers: false,
@@ -61,14 +74,6 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
   const [user, setUser] = useState<any | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
-  // Tokens principais do WorldChain incluindo TPulseFi
-  const MAIN_TOKENS = {
-    TPF: "0x834a73c0a83F3BCe349A116FFB2A4c2d1C651E45", // TPulseFi Token
-    WETH: "0x4200000000000000000000000000000000000006", // Wrapped Ethereum
-    USDCe: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1", // USD Coin
-    WLD: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003", // Worldcoin
-  }
-
   useEffect(() => {
     initializeProvider()
   }, [])
@@ -76,24 +81,29 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
   const initializeProvider = async () => {
     try {
       setConnectionStatus("loading")
-      console.log("🚀 Inicializando TPulseFi Wallet - APENAS DADOS REAIS...")
+      console.log("🚀 Inicializando TPulseFi Wallet - Holdstation SDK REAL...")
 
       // Testa BigNumber browser-native primeiro
       const bigNumberOK = testBigNumberBrowserNative()
       console.log("🧮 BigNumber v0 browser-native test:", bigNumberOK ? "✅ OK" : "❌ FALHOU")
 
-      // Carrega Ethers
+      // 🔥 CARREGA ETHERS CORRETAMENTE
       try {
         const ethersMod = await import("ethers")
-        ethers = ethersMod.ethers ?? ethersMod
-        console.log("✅ Ethers.js carregado")
+        // Ethers v5/v6 compatibility
+        if (ethersMod.ethers) {
+          ethers = ethersMod.ethers
+        } else {
+          ethers = ethersMod
+        }
+        console.log("✅ Ethers.js carregado:", ethers.version || "v6+")
       } catch (ethersError) {
         console.error("❌ Erro ao carregar Ethers:", ethersError)
         setConnectionStatus("error")
         return
       }
 
-      // Carrega WorldChain SDK com versão v0 browser-native
+      // Carrega WorldChain SDK
       const { TokenProvider, sdkLoaded } = await loadWorldChainSDKV0Native()
 
       // Atualiza status das dependências
@@ -103,40 +113,47 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
         tokenProvider: !!TokenProvider,
       })
 
-      // 🔥 APENAS DADOS REAIS - Se o SDK não carregou, ERRO
       if (!TokenProvider || !sdkLoaded) {
-        console.error("❌ SDK não carregou - TPulseFi requer conexão real!")
+        console.error("❌ SDK não carregou - TPulseFi requer Holdstation SDK!")
         setConnectionStatus("error")
         return
       }
 
-      console.log("🎯 SDK carregado! Aguardando autenticação...")
+      console.log("🎯 Holdstation SDK carregado! Configurando provider...")
 
-      // Configura o provider real
+      // 🔥 CONFIGURA PROVIDER CONFORME DOCUMENTAÇÃO
       try {
         console.log("🌐 Conectando ao WorldChain RPC...")
-        const provider = new ethers.providers.JsonRpcProvider("https://worldchain-mainnet.g.alchemy.com/public")
 
-        // Testa conexão com timeout
-        const networkPromise = provider.getNetwork()
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Timeout de conexão")), 15000),
-        )
-
-        const network = await Promise.race([networkPromise, timeoutPromise])
-        console.log("✅ Conectado ao WorldChain:", network)
-
-        // Configura o partner code para evitar warnings
-        if (TokenProvider.setPartnerCode) {
-          TokenProvider.setPartnerCode("tpulsefi")
-          console.log("✅ Partner code configurado")
+        // Cria provider ethers
+        let provider
+        if (ethers.providers?.JsonRpcProvider) {
+          // Ethers v5
+          provider = new ethers.providers.JsonRpcProvider("https://worldchain-mainnet.g.alchemy.com/public")
+        } else if (ethers.JsonRpcProvider) {
+          // Ethers v6
+          provider = new ethers.JsonRpcProvider("https://worldchain-mainnet.g.alchemy.com/public")
+        } else {
+          throw new Error("JsonRpcProvider não encontrado")
         }
 
+        // Testa conexão
+        const network = await provider.getNetwork()
+        console.log("✅ Conectado ao WorldChain:", network)
+
+        // 🔥 CRIA TOKENPROVIDER CONFORME DOCUMENTAÇÃO
         const tokenProviderInstance = new TokenProvider({ provider })
+
+        // Configura partner code
+        if (tokenProviderInstance.setPartnerCode) {
+          tokenProviderInstance.setPartnerCode("tpulsefi")
+          console.log("✅ Partner code 'tpulsefi' configurado")
+        }
+
         setTokenProvider(tokenProviderInstance)
         setConnectionStatus("connected")
 
-        console.log("🎉 TPulseFi Wallet inicializado com dados REAIS!")
+        console.log("🎉 TPulseFi Wallet inicializado com Holdstation SDK!")
       } catch (networkError) {
         console.error("❌ Erro de rede:", (networkError as Error).message)
         setConnectionStatus("error")
@@ -158,28 +175,70 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
       setWalletAddress(userWalletAddress)
       console.log("🎉 Carteira conectada:", userWalletAddress)
 
-      // Carregar balances reais imediatamente
-      await loadBalances(tokenProvider, userWalletAddress)
+      // 🔥 BUSCA TOKENS REAIS DA CARTEIRA
+      await refreshWalletTokens()
     } catch (error) {
       console.error("❌ Erro ao conectar carteira:", (error as Error).message)
     }
   }
 
-  const loadBalances = async (provider: any, wallet: string) => {
+  // 🔥 BUSCA TODOS OS TOKENS DA CARTEIRA (conforme documentação)
+  const refreshWalletTokens = async () => {
+    if (!tokenProvider || !walletAddress) {
+      console.log("⚠️ Sem provider ou wallet para buscar tokens")
+      return
+    }
+
+    setIsLoadingTokens(true)
+    try {
+      console.log("🔍 Buscando tokens REAIS da carteira...")
+
+      // Busca todos os tokens da carteira usando tokenOf()
+      const tokens = await tokenProvider.tokenOf(walletAddress)
+      console.log("✅ Tokens encontrados:", tokens)
+
+      setWalletTokens(tokens)
+
+      if (tokens.length > 0) {
+        // Busca detalhes dos tokens usando details()
+        const details = await tokenProvider.details(...tokens)
+        console.log("✅ Detalhes dos tokens:", details)
+        setTokenDetails(details)
+
+        // Busca balances dos tokens usando balanceOf()
+        await loadBalances(tokens)
+      }
+    } catch (error) {
+      console.error("❌ Erro ao buscar tokens da carteira:", (error as Error).message)
+      setWalletTokens([])
+      setTokenDetails({})
+      setTokenBalances({})
+    } finally {
+      setIsLoadingTokens(false)
+    }
+  }
+
+  // 🔥 BUSCA BALANCES REAIS (conforme documentação)
+  const loadBalances = async (tokens: string[]) => {
+    if (!tokenProvider || !walletAddress) {
+      console.log("⚠️ Sem provider ou wallet para buscar balances")
+      return
+    }
+
     setIsLoadingBalances(true)
     try {
       console.log("💰 Carregando balances REAIS do WorldChain...")
 
-      const balances = await provider.balanceOf({
-        wallet,
-        tokens: Object.values(MAIN_TOKENS),
+      // Busca balances usando balanceOf() conforme documentação
+      const balances = await tokenProvider.balanceOf({
+        wallet: walletAddress,
+        tokens: tokens,
       })
 
       console.log("✅ Balances REAIS carregados:", balances)
       setTokenBalances(balances)
     } catch (error) {
       console.error("❌ Erro ao carregar balances reais:", (error as Error).message)
-      // 🔥 SEM FALLBACK - apenas limpa os balances
       setTokenBalances({})
     } finally {
       setIsLoadingBalances(false)
@@ -187,38 +246,10 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
   }
 
   const refreshBalances = async () => {
-    if (!tokenProvider || !walletAddress) {
-      console.log("⚠️ Sem provider ou wallet para atualizar")
-      return
-    }
-    await loadBalances(tokenProvider, walletAddress)
-  }
-
-  const getTokenDetails = async (tokens: string[]) => {
-    if (!tokenProvider) {
-      throw new Error("TokenProvider não disponível")
-    }
-
-    try {
-      const details = await tokenProvider.details(...tokens)
-      return details
-    } catch (error) {
-      console.error("❌ Erro ao buscar detalhes:", (error as Error).message)
-      throw error
-    }
-  }
-
-  const getWalletTokens = async (wallet: string) => {
-    if (!tokenProvider) {
-      throw new Error("TokenProvider não disponível")
-    }
-
-    try {
-      const tokens = await tokenProvider.tokenOf(wallet)
-      return tokens
-    } catch (error) {
-      console.error("❌ Erro ao buscar tokens:", (error as Error).message)
-      throw error
+    if (walletTokens.length > 0) {
+      await loadBalances(walletTokens)
+    } else {
+      await refreshWalletTokens()
     }
   }
 
@@ -241,6 +272,8 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
     setWalletAddress(null)
     setIsConnected(false)
     setTokenBalances({})
+    setTokenDetails({})
+    setWalletTokens([])
   }
 
   const value: WorldChainContextType = {
@@ -248,10 +281,12 @@ export function WorldChainProvider({ children }: WorldChainProviderProps) {
     isConnected,
     walletAddress,
     tokenBalances,
+    tokenDetails,
+    walletTokens,
     isLoadingBalances,
+    isLoadingTokens,
     refreshBalances,
-    getTokenDetails,
-    getWalletTokens,
+    refreshWalletTokens,
     sdkLoaded: dependencyStatus.sdk,
     connectionStatus,
     dependencyStatus,

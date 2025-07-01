@@ -20,6 +20,7 @@ import {
   Zap,
   Menu,
   LogOut,
+  Search,
 } from "lucide-react"
 
 import SendModal from "@/components/send-modal"
@@ -35,6 +36,7 @@ import DebugConsole from "@/components/debug-console"
 import WalletConnect from "@/components/wallet-connect"
 
 import { useWorldChain } from "@/components/worldchain-provider"
+import { formatUnits } from "ethers"
 
 export default function TPulseFiWallet() {
   /* ------------------------------------------------------------------ */
@@ -54,14 +56,51 @@ export default function TPulseFiWallet() {
   /* ------------------------------------------------------------------ */
   /* Global state from WorldChain context                               */
   /* ------------------------------------------------------------------ */
-  const { tokenBalances, isLoadingBalances, refreshBalances, connectionStatus, user, isAuthenticated, login, logout } =
-    useWorldChain()
+  const {
+    tokenBalances,
+    tokenDetails,
+    walletTokens,
+    isLoadingBalances,
+    isLoadingTokens,
+    refreshBalances,
+    refreshWalletTokens,
+    connectionStatus,
+    user,
+    isAuthenticated,
+    login,
+    logout,
+  } = useWorldChain()
 
   /* ------------------------------------------------------------------ */
-  /* Demo numbers – replace when real data comes from provider          */
+  /* Calculate real token amounts (no USD values)                       */
   /* ------------------------------------------------------------------ */
-  const portfolioBalanceTPF = 15420.75
-  const portfolioValueUSD = 23156.89
+  const calculateTokenAmounts = () => {
+    let totalTokens = 0
+    let tpfAmount = 0
+
+    walletTokens.forEach((tokenAddress) => {
+      const balance = tokenBalances[tokenAddress]
+      const details = tokenDetails[tokenAddress]
+
+      if (balance && balance !== "0" && details) {
+        totalTokens++
+
+        // Se for TPF, calcula a quantidade
+        if (details.symbol === "TPF") {
+          try {
+            const formatted = formatUnits(balance, details.decimals)
+            tpfAmount = Number.parseFloat(formatted)
+          } catch (error) {
+            console.error("Erro ao calcular TPF:", error)
+          }
+        }
+      }
+    })
+
+    return { totalTokens, tpfAmount }
+  }
+
+  const { totalTokens, tpfAmount } = calculateTokenAmounts()
 
   /* ------------------------------------------------------------------ */
   /* Matrix-style scan-line animation                                   */
@@ -97,7 +136,7 @@ export default function TPulseFiWallet() {
             <h1 className="mt-4 text-2xl font-bold bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
               TPulseFi Wallet
             </h1>
-            <p className="text-gray-400 text-sm mt-1">The Future of DeFi on WorldChain</p>
+            <p className="text-gray-400 text-sm mt-1">Real Tokens via Holdstation SDK</p>
           </div>
 
           {/* ---- Status, debug & SDK tests (same as full UI) ---- */}
@@ -200,23 +239,41 @@ export default function TPulseFiWallet() {
 
           {/* ---------- WALLET TAB ---------- */}
           <TabsContent value="wallet" className="space-y-4">
-            {/* Balance card */}
+            {/* Balance card - REAL QUANTITIES ONLY */}
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm">Saldo total</CardTitle>
-                  <Button variant="ghost" size="icon" onClick={() => setShowBalance((v) => !v)}>
-                    {showBalance ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                  </Button>
+                  <CardTitle className="text-sm">Tokens Reais</CardTitle>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={refreshWalletTokens}
+                      disabled={isLoadingTokens}
+                      className="h-8 w-8 text-purple-400 hover:bg-purple-500/20"
+                    >
+                      <Search className={`w-4 h-4 ${isLoadingTokens ? "animate-spin" : ""}`} />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => setShowBalance((v) => !v)}>
+                      {showBalance ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {showBalance ? portfolioBalanceTPF.toLocaleString() : "••••••••"}
+                  {showBalance
+                    ? tpfAmount > 0
+                      ? tpfAmount.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 4,
+                        })
+                      : "0.00"
+                    : "••••••••"}
                 </div>
-                <div className="text-xs text-gray-400">TPF</div>
-                <div className="text-sm text-gray-400">
-                  {showBalance ? `≈ $${portfolioValueUSD.toLocaleString()}` : "≈ $••••••"}
+                <div className="text-xs text-gray-400">TPF (Quantidade Real)</div>
+                <div className="text-sm text-cyan-400 mt-1">
+                  {totalTokens} tokens com saldo • {walletTokens.length} contratos
                 </div>
               </CardContent>
             </Card>
@@ -237,23 +294,23 @@ export default function TPulseFiWallet() {
               </Button>
             </div>
 
-            {/* Portfolio stats */}
+            {/* Real blockchain stats */}
             <div className="grid grid-cols-2 gap-3">
               <Card>
                 <CardContent className="p-3">
-                  <div className="text-xs text-gray-400">Preço TPF</div>
-                  <div className="text-lg font-bold">$1.502</div>
+                  <div className="text-xs text-gray-400">Tokens Únicos</div>
+                  <div className="text-lg font-bold text-cyan-400">{walletTokens.length}</div>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-3">
-                  <div className="text-xs text-gray-400">Volume 24 h</div>
-                  <div className="text-lg font-bold">$2.4 M</div>
+                  <div className="text-xs text-gray-400">Com Saldo</div>
+                  <div className="text-lg font-bold text-green-400">{totalTokens}</div>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Token balances */}
+            {/* Token balances - REAL QUANTITIES */}
             <TokenBalanceCard tokenBalances={tokenBalances} isLoading={isLoadingBalances} onRefresh={refreshBalances} />
           </TabsContent>
 
@@ -262,11 +319,10 @@ export default function TPulseFiWallet() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm">Histórico</CardTitle>
-                <CardDescription>Todas as transações</CardDescription>
+                <CardDescription>Transações reais da blockchain</CardDescription>
               </CardHeader>
               <CardContent>
-                {/* Placeholder – implement real history later */}
-                <p className="text-gray-400 text-sm">Histórico real será exibido aqui.</p>
+                <p className="text-gray-400 text-sm">Histórico real será implementado em breve.</p>
               </CardContent>
             </Card>
           </TabsContent>
@@ -279,15 +335,26 @@ export default function TPulseFiWallet() {
                 <CardDescription>Gerencie sua carteira</CardDescription>
               </CardHeader>
               <CardContent>
-                {/* Example setting */}
-                <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/40">
-                  <div>
-                    <h3 className="text-sm text-gray-300">Endereço</h3>
-                    <p className="text-xs text-gray-500">{user.walletAddress}</p>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/40">
+                    <div>
+                      <h3 className="text-sm text-gray-300">Endereço</h3>
+                      <p className="text-xs text-gray-500">{user.walletAddress}</p>
+                    </div>
+                    <Button variant="ghost" size="icon">
+                      <Copy className="w-4 h-4" />
+                    </Button>
                   </div>
-                  <Button variant="ghost" size="icon">
-                    <Copy className="w-4 h-4" />
-                  </Button>
+
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/40">
+                    <div>
+                      <h3 className="text-sm text-gray-300">Tokens Encontrados</h3>
+                      <p className="text-xs text-gray-500">{walletTokens.length} contratos únicos</p>
+                    </div>
+                    <Badge variant="secondary" className="bg-cyan-500/20 text-cyan-400 border-cyan-500/30">
+                      REAL
+                    </Badge>
+                  </div>
                 </div>
               </CardContent>
             </Card>
