@@ -1,105 +1,133 @@
 # 🔧 Guia de Solução de Problemas - TPulseFi Wallet
 
-## 🚨 Problemas Comuns
+## 🚨 Problema Principal: Conflito de Dependências
 
-### 1. **npm install travado**
+### Sintomas:
+- `npm error code EOVERRIDE`
+- `Override for ethers@latest conflicts with direct dependency`
+- Módulos não encontrados após instalação
+
+### Solução:
+
+#### 1. **Limpeza Completa** (Recomendado)
 \`\`\`bash
-# Parar processo
-Ctrl+C
-
 # Limpar tudo
+npm run clean
+
+# Ou manualmente:
 rm -rf node_modules package-lock.json .next
 npm cache clean --force
-
-# Reinstalar
-npm install --no-optional --no-fund --no-audit
 \`\`\`
 
-### 2. **Dependências WorldChain não encontradas**
+#### 2. **Instalação com Legacy Peer Deps**
 \`\`\`bash
-# Instalar manualmente
-npm install @holdstation/worldchain-sdk
-npm install @holdstation/worldchain-ethers-v6
-npm install ethers
-npm install bignumber.js
+# Instalar com flag especial
+npm install --legacy-peer-deps --no-audit --no-fund
+
+# Instalar WorldChain separadamente
+npm install @holdstation/worldchain-sdk --legacy-peer-deps
+npm install @holdstation/worldchain-ethers-v6 --legacy-peer-deps
+npm install ethers@^6.8.0 --legacy-peer-deps
+npm install bignumber.js --legacy-peer-deps
 \`\`\`
 
-### 3. **Erro de BigNumber**
-\`\`\`bash
-# Verificar versão
-npm list bignumber.js
-
-# Reinstalar se necessário
-npm uninstall bignumber.js
-npm install bignumber.js@^9.1.2
-\`\`\`
-
-### 4. **Conflitos de versão do Ethers**
-\`\`\`bash
-# Forçar versão específica
-npm install ethers@^6.8.0 --save-exact
-\`\`\`
-
-## 🛠️ Scripts Úteis
-
-### Testar Dependências
-\`\`\`bash
-npm run test-deps
-\`\`\`
-
-### Correção Rápida
+#### 3. **Correção Automática**
 \`\`\`bash
 npm run quick-fix
 \`\`\`
 
-### Instalação Limpa
+## 🔍 Verificações
+
+### Verificar se funcionou:
 \`\`\`bash
-npm run clean && npm install
+npm run test-deps
 \`\`\`
 
-## 🔍 Verificações Manuais
-
-### 1. **Verificar Node.js**
+### Verificação manual:
 \`\`\`bash
-node --version  # Deve ser >= 16.0.0
-npm --version   # Deve ser >= 8.0.0
+# Testar cada dependência
+node -e "console.log(require('@holdstation/worldchain-sdk'))"
+node -e "console.log(require('@holdstation/worldchain-ethers-v6'))"
+node -e "console.log(require('ethers').version)"
+node -e "console.log(new (require('bignumber.js'))('123.45').toString())"
 \`\`\`
 
-### 2. **Verificar Dependências**
+## 🛠️ Soluções Alternativas
+
+### Se `npm install` continuar falhando:
+
+#### Opção 1: Yarn
 \`\`\`bash
-npm list @holdstation/worldchain-sdk
-npm list ethers
-npm list bignumber.js
+# Instalar Yarn
+npm install -g yarn
+
+# Usar Yarn em vez de npm
+yarn install
+yarn add @holdstation/worldchain-sdk @holdstation/worldchain-ethers-v6 ethers bignumber.js
 \`\`\`
 
-### 3. **Teste Manual**
+#### Opção 2: Forçar instalação
 \`\`\`bash
-node -e "
-console.log('Testando...');
-try {
-  const sdk = require('@holdstation/worldchain-sdk');
-  console.log('✅ SDK OK');
-} catch (e) {
-  console.log('❌ SDK Falhou:', e.message);
-}
-"
+npm install --force --legacy-peer-deps --no-audit
 \`\`\`
 
-## 🆘 Se Nada Funcionar
+#### Opção 3: Instalar uma por vez
+\`\`\`bash
+npm install next react react-dom
+npm install @holdstation/worldchain-sdk --legacy-peer-deps
+npm install @holdstation/worldchain-ethers-v6 --legacy-peer-deps
+npm install ethers@6.8.0 --save-exact
+npm install bignumber.js
+\`\`\`
 
-1. **Deletar Codespace atual**
-2. **Criar novo Codespace**
-3. **Aguardar setup automático**
-4. **Executar:**
-   \`\`\`bash
-   npm install
-   npm run install-worldchain
-   npm run test-deps
-   npm run dev
-   \`\`\`
+## 🔄 Reset Completo
 
-## 📞 Suporte
+Se nada funcionar:
 
-- **GitHub Issues**: Reporte problemas no repositório
-- **Logs**: Sempre inclua logs completos
-- **Versões**: Mencione versões do Node.js e npm
+\`\`\`bash
+# 1. Deletar Codespace atual no GitHub
+# 2. Criar novo Codespace
+# 3. Executar:
+npm install --legacy-peer-deps
+npm run install-worldchain
+npm run test-deps
+npm run dev
+\`\`\`
+
+## 📋 Comandos Úteis
+
+\`\`\`bash
+# Verificar versões
+node --version
+npm --version
+
+# Listar dependências instaladas
+npm list --depth=0
+
+# Verificar conflitos
+npm ls
+
+# Auditoria de segurança
+npm audit
+
+# Limpar cache
+npm cache clean --force
+\`\`\`
+
+## 🆘 Se Persistir o Problema
+
+1. **Copie o erro completo** dos logs
+2. **Verifique versão do Node.js**: `node --version` (deve ser >= 16)
+3. **Tente em ambiente local** se possível
+4. **Reporte o problema** com logs completos
+
+## ✅ Verificação Final
+
+Quando tudo estiver funcionando:
+
+\`\`\`bash
+npm run test-deps  # Deve mostrar ✅ para todas
+npm run dev        # Deve iniciar sem erros
+\`\`\`
+
+Acesse: http://localhost:3000

@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "build": "next build",
+    "clean": "rm -rf node_modules package-lock.json .next && npm cache clean --force",
     "dev": "next dev",
     "install-worldchain": "npm install @holdstation/worldchain-sdk @holdstation/worldchain-ethers-v6 ethers bignumber.js",
     "lint": "next lint",
@@ -11,9 +12,6 @@
     "setup": "npm install && npm run test-deps",
     "start": "next start",
     "test-deps": "node scripts/test-dependencies.js"
-  },
-  "overrides": {
-    "ethers": "^6.8.0"
   },
   "dependencies": {
     "@holdstation/worldchain-ethers-v6": "latest",

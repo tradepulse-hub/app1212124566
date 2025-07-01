@@ -2,68 +2,92 @@
 
 console.log("🧪 Testando dependências do WorldChain SDK...\n")
 
-const dependencies = ["@holdstation/worldchain-sdk", "@holdstation/worldchain-ethers-v6", "ethers", "bignumber.js"]
+const dependencies = [
+  { name: "@holdstation/worldchain-sdk", required: true },
+  { name: "@holdstation/worldchain-ethers-v6", required: true },
+  { name: "ethers", required: true },
+  { name: "bignumber.js", required: true },
+]
 
-let allGood = true
+let successCount = 0
+const totalCount = dependencies.length
 
-for (const dep of dependencies) {
+console.log("📦 Verificando dependências...\n")
+
+dependencies.forEach((dep, index) => {
   try {
-    const module = require(dep)
-    console.log(`✅ ${dep}: OK`)
+    const module = require(dep.name)
+    console.log(`✅ ${dep.name}: OK`)
 
-    // Mostrar algumas informações sobre o módulo
-    if (dep === "ethers") {
+    // Mostrar informações específicas
+    if (dep.name === "ethers") {
       console.log(`   📦 Versão: ${module.version || "N/A"}`)
-    } else if (dep === "@holdstation/worldchain-sdk") {
-      const keys = Object.keys(module).slice(0, 5)
-      console.log(`   🔑 Exports: ${keys.join(", ")}${keys.length >= 5 ? "..." : ""}`)
-    } else if (dep === "bignumber.js") {
-      const bn = new module("123.456")
-      console.log(`   🔢 Teste: ${bn.toString()}`)
+      console.log(`   🔑 Exports: ${Object.keys(module).slice(0, 3).join(", ")}...`)
+    } else if (dep.name === "@holdstation/worldchain-sdk") {
+      const keys = Object.keys(module)
+      console.log(`   🔑 Exports (${keys.length}): ${keys.slice(0, 5).join(", ")}${keys.length > 5 ? "..." : ""}`)
+    } else if (dep.name === "@holdstation/worldchain-ethers-v6") {
+      const keys = Object.keys(module)
+      console.log(`   ⚡ Exports (${keys.length}): ${keys.slice(0, 3).join(", ")}${keys.length > 3 ? "..." : ""}`)
+    } else if (dep.name === "bignumber.js") {
+      const BigNumber = module.default || module
+      const test = new BigNumber("123.456")
+      console.log(`   🔢 Teste: ${test.toString()}`)
     }
+
+    successCount++
   } catch (error) {
-    console.log(`❌ ${dep}: FALHOU`)
+    console.log(`❌ ${dep.name}: FALHOU`)
     console.log(`   💥 Erro: ${error.message}`)
-    allGood = false
+
+    // Sugestões específicas
+    if (dep.name.includes("@holdstation")) {
+      console.log(`   💡 Sugestão: npm install ${dep.name} --legacy-peer-deps`)
+    }
   }
-}
 
-console.log("\n" + "=".repeat(50))
+  console.log("")
+})
 
-if (allGood) {
-  console.log("🎉 Todas as dependências estão funcionando!")
-  console.log("✅ Você pode executar: npm run dev")
+console.log("=".repeat(60))
+console.log(`📊 RESULTADO: ${successCount}/${totalCount} dependências funcionando`)
+
+if (successCount === totalCount) {
+  console.log("🎉 TODAS AS DEPENDÊNCIAS ESTÃO OK!")
+  console.log("✅ O sistema está pronto para uso!")
+
+  // Teste avançado do SDK
+  console.log("\n🔬 Executando teste avançado...")
+  try {
+    const sdk = require("@holdstation/worldchain-sdk")
+    const ethersAdapter = require("@holdstation/worldchain-ethers-v6")
+    const ethers = require("ethers")
+
+    console.log("✅ Todos os módulos carregados com sucesso!")
+
+    // Verificar componentes principais
+    const components = ["TokenProvider", "SwapHelper", "Sender", "Manager"]
+    components.forEach((comp) => {
+      if (sdk[comp]) {
+        console.log(`✅ ${comp} disponível`)
+      } else {
+        console.log(`⚠️ ${comp} não encontrado`)
+      }
+    })
+
+    console.log("\n🚀 Sistema 100% funcional! Execute: npm run dev")
+  } catch (error) {
+    console.log("⚠️ Erro no teste avançado:", error.message)
+    console.log("📝 Módulos carregados individualmente, mas integração pode ter problemas")
+  }
 } else {
-  console.log("⚠️  Algumas dependências falharam.")
+  console.log("❌ ALGUMAS DEPENDÊNCIAS FALHARAM")
   console.log("🔧 Execute: npm run quick-fix")
+  console.log("📝 Ou instale manualmente:")
+
+  dependencies.forEach((dep) => {
+    console.log(`   npm install ${dep.name} --legacy-peer-deps`)
+  })
 }
 
-console.log("=".repeat(50))
-
-// Teste específico do WorldChain SDK
-console.log("\n🌐 Testando WorldChain SDK específico...")
-
-try {
-  const worldchainSDK = require("@holdstation/worldchain-sdk")
-  const ethers = require("@holdstation/worldchain-ethers-v6")
-
-  console.log("✅ WorldChain SDK carregado com sucesso!")
-  console.log(`📦 SDK exports: ${Object.keys(worldchainSDK).length} itens`)
-  console.log(`⚡ Ethers exports: ${Object.keys(ethers).length} itens`)
-
-  // Tentar criar instâncias básicas
-  if (worldchainSDK.TokenProvider) {
-    console.log("✅ TokenProvider disponível")
-  }
-  if (worldchainSDK.SwapHelper) {
-    console.log("✅ SwapHelper disponível")
-  }
-  if (worldchainSDK.Sender) {
-    console.log("✅ Sender disponível")
-  }
-} catch (error) {
-  console.log("❌ Erro ao testar WorldChain SDK:")
-  console.log(`   💥 ${error.message}`)
-}
-
-console.log("\n🚀 Teste concluído!")
+console.log("=".repeat(60))
