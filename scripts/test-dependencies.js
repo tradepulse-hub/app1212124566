@@ -1,93 +1,123 @@
 #!/usr/bin/env node
 
-console.log("🧪 Testando dependências do WorldChain SDK...\n")
+console.log("🧪 Testando Dependências TPulseFi Wallet\n")
 
 const dependencies = [
-  { name: "@holdstation/worldchain-sdk", required: true },
-  { name: "@holdstation/worldchain-ethers-v6", required: true },
-  { name: "ethers", required: true },
-  { name: "bignumber.js", required: true },
+  { name: "next", required: true, category: "Framework" },
+  { name: "react", required: true, category: "Framework" },
+  { name: "react-dom", required: true, category: "Framework" },
+  { name: "ethers", required: false, category: "Blockchain" },
+  { name: "bignumber.js", required: false, category: "Blockchain" },
+  { name: "@holdstation/worldchain-sdk", required: false, category: "WorldChain" },
+  { name: "@holdstation/worldchain-ethers-v6", required: false, category: "WorldChain" },
 ]
 
-let successCount = 0
-const totalCount = dependencies.length
+const results = {
+  framework: { success: 0, total: 0 },
+  blockchain: { success: 0, total: 0 },
+  worldchain: { success: 0, total: 0 },
+  overall: { success: 0, total: dependencies.length },
+}
 
-console.log("📦 Verificando dependências...\n")
+console.log("📦 Verificando dependências por categoria...\n")
 
-dependencies.forEach((dep, index) => {
+dependencies.forEach((dep) => {
+  const category = dep.category.toLowerCase()
+  results[category].total++
+  results.overall.total = dependencies.length
+
   try {
     const module = require(dep.name)
-    console.log(`✅ ${dep.name}: OK`)
+    console.log(`✅ ${dep.name} (${dep.category})`)
 
-    // Mostrar informações específicas
+    // Informações específicas
     if (dep.name === "ethers") {
       console.log(`   📦 Versão: ${module.version || "N/A"}`)
-      console.log(`   🔑 Exports: ${Object.keys(module).slice(0, 3).join(", ")}...`)
-    } else if (dep.name === "@holdstation/worldchain-sdk") {
-      const keys = Object.keys(module)
-      console.log(`   🔑 Exports (${keys.length}): ${keys.slice(0, 5).join(", ")}${keys.length > 5 ? "..." : ""}`)
-    } else if (dep.name === "@holdstation/worldchain-ethers-v6") {
-      const keys = Object.keys(module)
-      console.log(`   ⚡ Exports (${keys.length}): ${keys.slice(0, 3).join(", ")}${keys.length > 3 ? "..." : ""}`)
     } else if (dep.name === "bignumber.js") {
       const BigNumber = module.default || module
       const test = new BigNumber("123.456")
       console.log(`   🔢 Teste: ${test.toString()}`)
+    } else if (dep.name.includes("@holdstation")) {
+      const keys = Object.keys(module)
+      console.log(`   🔑 Exports: ${keys.slice(0, 3).join(", ")}${keys.length > 3 ? "..." : ""} (${keys.length} total)`)
+    } else if (dep.name === "next") {
+      console.log(`   🚀 Framework: Next.js`)
     }
 
-    successCount++
+    results[category].success++
+    results.overall.success++
   } catch (error) {
-    console.log(`❌ ${dep.name}: FALHOU`)
-    console.log(`   💥 Erro: ${error.message}`)
-
-    // Sugestões específicas
-    if (dep.name.includes("@holdstation")) {
-      console.log(`   💡 Sugestão: npm install ${dep.name} --legacy-peer-deps`)
-    }
+    const status = dep.required ? "❌" : "⚠️"
+    const type = dep.required ? "OBRIGATÓRIO" : "OPCIONAL"
+    console.log(`${status} ${dep.name} (${dep.category}) - ${type}`)
+    console.log(`   💥 ${error.message}`)
   }
 
   console.log("")
 })
 
-console.log("=".repeat(60))
-console.log(`📊 RESULTADO: ${successCount}/${totalCount} dependências funcionando`)
+// Resumo por categoria
+console.log("=" * 60)
+console.log("📊 RESUMO POR CATEGORIA:")
+console.log("")
 
-if (successCount === totalCount) {
-  console.log("🎉 TODAS AS DEPENDÊNCIAS ESTÃO OK!")
-  console.log("✅ O sistema está pronto para uso!")
+Object.keys(results).forEach((category) => {
+  if (category === "overall") return
 
-  // Teste avançado do SDK
-  console.log("\n🔬 Executando teste avançado...")
-  try {
-    const sdk = require("@holdstation/worldchain-sdk")
-    const ethersAdapter = require("@holdstation/worldchain-ethers-v6")
-    const ethers = require("ethers")
+  const cat = results[category]
+  const percentage = cat.total > 0 ? Math.round((cat.success / cat.total) * 100) : 0
+  const status = cat.success === cat.total ? "✅" : cat.success > 0 ? "⚠️" : "❌"
 
-    console.log("✅ Todos os módulos carregados com sucesso!")
+  console.log(`${status} ${category.toUpperCase()}: ${cat.success}/${cat.total} (${percentage}%)`)
+})
 
-    // Verificar componentes principais
-    const components = ["TokenProvider", "SwapHelper", "Sender", "Manager"]
-    components.forEach((comp) => {
-      if (sdk[comp]) {
-        console.log(`✅ ${comp} disponível`)
-      } else {
-        console.log(`⚠️ ${comp} não encontrado`)
-      }
-    })
+console.log("")
+console.log(`🎯 GERAL: ${results.overall.success}/${results.overall.total} dependências`)
 
-    console.log("\n🚀 Sistema 100% funcional! Execute: npm run dev")
-  } catch (error) {
-    console.log("⚠️ Erro no teste avançado:", error.message)
-    console.log("📝 Módulos carregados individualmente, mas integração pode ter problemas")
-  }
+// Determinar status do sistema
+const frameworkOK = results.framework.success === results.framework.total
+const blockchainOK = results.blockchain.success > 0
+const worldchainOK = results.worldchain.success === results.worldchain.total
+
+console.log("")
+console.log("🔍 STATUS DO SISTEMA:")
+
+if (frameworkOK) {
+  console.log("✅ Framework: Pronto para desenvolvimento básico")
 } else {
-  console.log("❌ ALGUMAS DEPENDÊNCIAS FALHARAM")
-  console.log("🔧 Execute: npm run quick-fix")
-  console.log("📝 Ou instale manualmente:")
-
-  dependencies.forEach((dep) => {
-    console.log(`   npm install ${dep.name} --legacy-peer-deps`)
-  })
+  console.log("❌ Framework: Problemas críticos detectados")
 }
 
-console.log("=".repeat(60))
+if (blockchainOK) {
+  console.log("✅ Blockchain: Funcionalidades básicas disponíveis")
+} else {
+  console.log("⚠️ Blockchain: Funcionalidades limitadas")
+}
+
+if (worldchainOK && results.worldchain.total > 0) {
+  console.log("✅ WorldChain: SDK completo disponível")
+} else if (results.worldchain.success > 0) {
+  console.log("⚠️ WorldChain: SDK parcialmente disponível")
+} else {
+  console.log("❌ WorldChain: SDK não disponível")
+}
+
+console.log("")
+
+// Recomendações
+if (frameworkOK && blockchainOK && worldchainOK) {
+  console.log("🎉 SISTEMA COMPLETO!")
+  console.log("🚀 Execute: npm run dev")
+  console.log("🌐 Acesse: http://localhost:3000")
+} else if (frameworkOK) {
+  console.log("⚡ SISTEMA BÁSICO FUNCIONAL")
+  console.log("🚀 Execute: npm run dev (funcionalidades limitadas)")
+  console.log("")
+  console.log("🔧 Para funcionalidades completas:")
+  console.log("   npm run manual-install")
+} else {
+  console.log("❌ SISTEMA NÃO FUNCIONAL")
+  console.log("🔧 Execute: npm run manual-install")
+}
+
+console.log("=" * 60)

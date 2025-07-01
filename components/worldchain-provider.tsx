@@ -1,447 +1,27 @@
 "use client"
 
-import type React from "react"
-import { createContext, useContext, useState, useEffect, useCallback } from "react"
-import {
-  loadWorldChainSDKComplete,
-  createTokenProviderComplete,
-  createSwapHelperComplete,
-  executeSwap,
-  sendToken,
-  getSimpleQuote,
-  getSmartQuote,
-  watchTransactionHistory,
-  getTransactionHistory,
-  getPopularTokens,
-} from "@/lib/worldchain-sdk-complete"
+import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 
-interface TokenDetails {
-  address: string
-  symbol: string
-  name: string
-  decimals: number
-  chainId?: number
-}
-
-interface Transaction {
-  hash: string
-  block: number
-  to: string
-  success: string
-  date: Date
-  method: string
-  protocol: string
-  transfers: {
-    tokenAddress: string
-    amount: string
-    from: string
-    to: string
-  }[]
-}
-
+// Tipos para o contexto
 interface WorldChainContextType {
-  // SDK Status
   isSDKLoaded: boolean
-  isConnected: boolean
-  walletAddress: string | null
   sdkError: string | null
-
-  // Token Data
-  tokenDetails: Record<string, TokenDetails>
-  tokenBalances: Record<string, string>
-  walletTokens: string[]
-  popularTokens: TokenDetails[]
-
-  // Transaction History
-  transactionHistory: Transaction[]
-  isLoadingHistory: boolean
-
-  // Loading States
-  isLoadingTokens: boolean
-  isLoadingBalances: boolean
-
-  // Functions
-  connectWallet: (address: string) => void
-  disconnectWallet: () => void
-  refreshTokenData: () => Promise<void>
-  refreshHistory: () => Promise<void>
-  getSwapQuote: (params: {
-    tokenIn: string
-    tokenOut: string
-    amountIn: string
-    slippage: string
-    fee: string
-  }) => Promise<any>
-  executeSwap: (params: {
-    tokenIn: string
-    tokenOut: string
-    amountIn: string
-    slippage: string
-    fee: string
-  }) => Promise<any>
-  sendToken: (params: {
-    to: string
-    amount: number
-    token?: string
-  }) => Promise<any>
-  getSimpleQuote: (tokenIn: string, tokenOut: string) => Promise<any>
-  getSmartQuote: (tokenIn: string, options: { slippage: number; deadline: number }) => Promise<any>
+  isConnected: boolean
+  address: string | null
+  balance: string | null
+  tokens: any[]
+  transactions: any[]
+  // Funções
+  connect: () => Promise<void>
+  disconnect: () => void
+  sendToken: (to: string, amount: string, token?: string) => Promise<string>
+  swapTokens: (fromToken: string, toToken: string, amount: string) => Promise<string>
+  getQuote: (fromToken: string, toToken: string, amount: string) => Promise<any>
+  refreshBalance: () => Promise<void>
+  refreshTransactions: () => Promise<void>
 }
 
 const WorldChainContext = createContext<WorldChainContextType | undefined>(undefined)
-
-export function WorldChainProvider({ children }: { children: React.ReactNode }) {
-  const [isSDKLoaded, setIsSDKLoaded] = useState(false)
-  const [isConnected, setIsConnected] = useState(false)
-  const [walletAddress, setWalletAddress] = useState<string | null>(null)
-  const [sdkError, setSdkError] = useState<string | null>(null)
-  const [tokenDetails, setTokenDetails] = useState<Record<string, TokenDetails>>({})
-  const [tokenBalances, setTokenBalances] = useState<Record<string, string>>({})
-  const [walletTokens, setWalletTokens] = useState<string[]>([])
-  const [popularTokens, setPopularTokens] = useState<TokenDetails[]>([])
-  const [transactionHistory, setTransactionHistory] = useState<Transaction[]>([])
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
-  const [isLoadingTokens, setIsLoadingTokens] = useState(false)
-  const [isLoadingBalances, setIsLoadingBalances] = useState(false)
-  const [historyWatcher, setHistoryWatcher] = useState<any>(null)
-
-  // Carrega SDK na inicialização
-  useEffect(() => {
-    loadSDK()
-  }, [])
-
-  // Monitora histórico quando conecta carteira
-  useEffect(() => {
-    if (walletAddress && isSDKLoaded) {
-      startHistoryWatcher()
-    } else {
-      stopHistoryWatcher()
-    }
-
-    return () => {
-      stopHistoryWatcher()
-    }
-  }, [walletAddress, isSDKLoaded])
-
-  const loadSDK = async () => {
-    try {
-      console.log("🚀 Carregando WorldChain SDK...")
-      const result = await loadWorldChainSDKComplete()
-
-      if (result.sdkLoaded) {
-        setIsSDKLoaded(true)
-        setPopularTokens(getPopularTokens())
-        setSdkError(null)
-        console.log("✅ WorldChain SDK carregado com sucesso!")
-      } else {
-        setIsSDKLoaded(false)
-        setSdkError(result.error || "Falha ao carregar SDK")
-        console.error("❌ Falha ao carregar WorldChain SDK:", result.error)
-      }
-    } catch (error) {
-      console.error("❌ Erro ao carregar SDK:", error)
-      setIsSDKLoaded(false)
-      setSdkError((error as Error).message)
-    }
-  }
-
-  const connectWallet = useCallback(
-    (address: string) => {
-      if (!isSDKLoaded) {
-        throw new Error("SDK não carregado")
-      }
-
-      console.log("🔗 Conectando carteira:", address)
-      setWalletAddress(address)
-      setIsConnected(true)
-
-      // Carrega dados da carteira
-      refreshTokenData()
-    },
-    [isSDKLoaded],
-  )
-
-  const disconnectWallet = useCallback(() => {
-    console.log("🔌 Desconectando carteira")
-    setWalletAddress(null)
-    setIsConnected(false)
-    setTokenDetails({})
-    setTokenBalances({})
-    setWalletTokens([])
-    setTransactionHistory([])
-    stopHistoryWatcher()
-  }, [])
-
-  const refreshTokenData = useCallback(async () => {
-    if (!walletAddress || !isSDKLoaded) {
-      throw new Error("SDK não carregado ou carteira não conectada")
-    }
-
-    setIsLoadingTokens(true)
-    setIsLoadingBalances(true)
-
-    try {
-      console.log("🔄 Atualizando dados dos tokens...")
-      const tokenProvider = await createTokenProviderComplete(walletAddress)
-
-      // 1. Descobre tokens da carteira
-      console.log("🔍 Descobrindo tokens da carteira...")
-      const discoveredTokens = await tokenProvider.tokenOf(walletAddress)
-      console.log("✅ Tokens descobertos:", discoveredTokens)
-
-      // 2. Combina com tokens populares
-      const allTokens = [...new Set([...discoveredTokens, ...popularTokens.map((t) => t.address)])]
-      setWalletTokens(discoveredTokens)
-
-      // 3. Busca detalhes dos tokens
-      if (allTokens.length > 0) {
-        console.log("📋 Buscando detalhes dos tokens...")
-        const details = await tokenProvider.details(...allTokens)
-        console.log("✅ Detalhes obtidos:", details)
-        setTokenDetails(details)
-
-        // 4. Busca balances
-        console.log("💰 Buscando balances...")
-        const balances = await tokenProvider.balanceOf({
-          wallet: walletAddress,
-          tokens: allTokens,
-        })
-        console.log("✅ Balances obtidos:", balances)
-        setTokenBalances(balances)
-      }
-    } catch (error) {
-      console.error("❌ Erro ao atualizar dados dos tokens:", error)
-      throw error
-    } finally {
-      setIsLoadingTokens(false)
-      setIsLoadingBalances(false)
-    }
-  }, [walletAddress, isSDKLoaded, popularTokens])
-
-  const startHistoryWatcher = useCallback(async () => {
-    if (!walletAddress || !isSDKLoaded || historyWatcher) return
-
-    try {
-      console.log("👀 Iniciando monitoramento de histórico...")
-      const result = await watchTransactionHistory(walletAddress, () => {
-        console.log("🔔 Nova atividade detectada, atualizando histórico...")
-        refreshHistory()
-      })
-
-      if (result.success && result.watcher) {
-        setHistoryWatcher(result.watcher)
-        await result.start()
-        console.log("✅ Monitoramento de histórico iniciado")
-
-        // Carrega histórico inicial
-        refreshHistory()
-      }
-    } catch (error) {
-      console.error("❌ Erro ao iniciar monitoramento:", error)
-      throw error
-    }
-  }, [walletAddress, isSDKLoaded, historyWatcher])
-
-  const stopHistoryWatcher = useCallback(() => {
-    if (historyWatcher) {
-      console.log("🛑 Parando monitoramento de histórico...")
-      if (historyWatcher.stop) {
-        historyWatcher.stop()
-      }
-      setHistoryWatcher(null)
-    }
-  }, [historyWatcher])
-
-  const refreshHistory = useCallback(async () => {
-    if (!walletAddress || !isSDKLoaded) {
-      throw new Error("SDK não carregado ou carteira não conectada")
-    }
-
-    setIsLoadingHistory(true)
-    try {
-      console.log("📋 Atualizando histórico de transações...")
-      const result = await getTransactionHistory(0, 100)
-
-      if (result.success) {
-        setTransactionHistory(result.transactions)
-        console.log("✅ Histórico atualizado:", result.transactions.length, "transações")
-      } else {
-        throw new Error(result.error)
-      }
-    } catch (error) {
-      console.error("❌ Erro ao atualizar histórico:", error)
-      throw error
-    } finally {
-      setIsLoadingHistory(false)
-    }
-  }, [walletAddress, isSDKLoaded])
-
-  const handleGetSwapQuote = useCallback(
-    async (params: {
-      tokenIn: string
-      tokenOut: string
-      amountIn: string
-      slippage: string
-      fee: string
-    }) => {
-      if (!isSDKLoaded) {
-        throw new Error("SDK não carregado")
-      }
-
-      try {
-        console.log("📊 Obtendo quote de swap...")
-        const swapHelper = await createSwapHelperComplete()
-
-        const quote = await swapHelper.quote({
-          tokenIn: params.tokenIn,
-          tokenOut: params.tokenOut,
-          amountIn: params.amountIn,
-          slippage: params.slippage,
-          fee: params.fee,
-        })
-
-        console.log("✅ Quote obtido:", quote)
-        return quote
-      } catch (error) {
-        console.error("❌ Erro ao obter quote:", error)
-        throw error
-      }
-    },
-    [isSDKLoaded],
-  )
-
-  const handleExecuteSwap = useCallback(
-    async (params: {
-      tokenIn: string
-      tokenOut: string
-      amountIn: string
-      slippage: string
-      fee: string
-    }) => {
-      if (!isSDKLoaded || !walletAddress) {
-        throw new Error("SDK não carregado ou carteira não conectada")
-      }
-
-      try {
-        const result = await executeSwap({
-          ...params,
-          walletAddress,
-        })
-
-        if (result.success) {
-          // Atualiza dados após swap bem-sucedido
-          setTimeout(() => {
-            refreshTokenData()
-            refreshHistory()
-          }, 2000)
-        }
-
-        return result
-      } catch (error) {
-        console.error("❌ Erro ao executar swap:", error)
-        throw error
-      }
-    },
-    [isSDKLoaded, walletAddress, refreshTokenData, refreshHistory],
-  )
-
-  const handleSendToken = useCallback(
-    async (params: {
-      to: string
-      amount: number
-      token?: string
-    }) => {
-      if (!isSDKLoaded || !walletAddress) {
-        throw new Error("SDK não carregado ou carteira não conectada")
-      }
-
-      try {
-        const result = await sendToken(params)
-
-        if (result.success) {
-          // Atualiza dados após envio bem-sucedido
-          setTimeout(() => {
-            refreshTokenData()
-            refreshHistory()
-          }, 2000)
-        }
-
-        return result
-      } catch (error) {
-        console.error("❌ Erro ao enviar token:", error)
-        throw error
-      }
-    },
-    [isSDKLoaded, walletAddress, refreshTokenData, refreshHistory],
-  )
-
-  const handleGetSimpleQuote = useCallback(
-    async (tokenIn: string, tokenOut: string) => {
-      if (!isSDKLoaded) {
-        throw new Error("SDK não carregado")
-      }
-
-      try {
-        return await getSimpleQuote(tokenIn, tokenOut)
-      } catch (error) {
-        console.error("❌ Erro ao obter quote simples:", error)
-        throw error
-      }
-    },
-    [isSDKLoaded],
-  )
-
-  const handleGetSmartQuote = useCallback(
-    async (tokenIn: string, options: { slippage: number; deadline: number }) => {
-      if (!isSDKLoaded) {
-        throw new Error("SDK não carregado")
-      }
-
-      try {
-        return await getSmartQuote(tokenIn, options)
-      } catch (error) {
-        console.error("❌ Erro ao obter quote inteligente:", error)
-        throw error
-      }
-    },
-    [isSDKLoaded],
-  )
-
-  const contextValue: WorldChainContextType = {
-    // SDK Status
-    isSDKLoaded,
-    isConnected,
-    walletAddress,
-    sdkError,
-
-    // Token Data
-    tokenDetails,
-    tokenBalances,
-    walletTokens,
-    popularTokens,
-
-    // Transaction History
-    transactionHistory,
-    isLoadingHistory,
-
-    // Loading States
-    isLoadingTokens,
-    isLoadingBalances,
-
-    // Functions
-    connectWallet,
-    disconnectWallet,
-    refreshTokenData,
-    refreshHistory,
-    getSwapQuote: handleGetSwapQuote,
-    executeSwap: handleExecuteSwap,
-    sendToken: handleSendToken,
-    getSimpleQuote: handleGetSimpleQuote,
-    getSmartQuote: handleGetSmartQuote,
-  }
-
-  return <WorldChainContext.Provider value={contextValue}>{children}</WorldChainContext.Provider>
-}
 
 export function useWorldChain() {
   const context = useContext(WorldChainContext)
@@ -449,4 +29,243 @@ export function useWorldChain() {
     throw new Error("useWorldChain must be used within a WorldChainProvider")
   }
   return context
+}
+
+interface WorldChainProviderProps {
+  children: ReactNode
+}
+
+export function WorldChainProvider({ children }: WorldChainProviderProps) {
+  const [isSDKLoaded, setIsSDKLoaded] = useState(false)
+  const [sdkError, setSdkError] = useState<string | null>(null)
+  const [isConnected, setIsConnected] = useState(false)
+  const [address, setAddress] = useState<string | null>(null)
+  const [balance, setBalance] = useState<string | null>(null)
+  const [tokens, setTokens] = useState<any[]>([])
+  const [transactions, setTransactions] = useState<any[]>([])
+
+  // SDK e componentes
+  const [sdk, setSdk] = useState<any>(null)
+  const [ethersAdapter, setEthersAdapter] = useState<any>(null)
+  const [provider, setProvider] = useState<any>(null)
+
+  // Carregar SDK
+  useEffect(() => {
+    async function loadSDK() {
+      try {
+        console.log("🔄 Carregando WorldChain SDK...")
+
+        // Tentar carregar as dependências
+        const [worldchainSDK, ethersV6, ethers, BigNumber] = await Promise.all([
+          import("@holdstation/worldchain-sdk").catch(() => null),
+          import("@holdstation/worldchain-ethers-v6").catch(() => null),
+          import("ethers").catch(() => null),
+          import("bignumber.js").catch(() => null),
+        ])
+
+        if (!worldchainSDK || !ethersV6 || !ethers || !BigNumber) {
+          throw new Error("Dependências do WorldChain SDK não encontradas")
+        }
+
+        console.log("✅ Dependências carregadas")
+
+        // Criar provider
+        const rpcProvider = new ethers.JsonRpcProvider("https://worldchain-mainnet.g.alchemy.com/public", {
+          chainId: 480,
+          name: "worldchain",
+        })
+
+        // Criar client
+        const client = new ethersV6.Client(rpcProvider)
+        const multicall3 = new ethersV6.Multicall3(rpcProvider)
+
+        // Criar componentes do SDK
+        const tokenProvider = new worldchainSDK.TokenProvider({ client, multicall3 })
+        const swapHelper = new worldchainSDK.SwapHelper({ client, multicall3 })
+        const sender = new worldchainSDK.Sender({ client })
+        const manager = new worldchainSDK.Manager({ client, multicall3 })
+
+        setSdk({
+          TokenProvider: tokenProvider,
+          SwapHelper: swapHelper,
+          Sender: sender,
+          Manager: manager,
+          worldchainSDK,
+          ethersV6,
+          ethers,
+          BigNumber,
+        })
+
+        setEthersAdapter(ethersV6)
+        setProvider(rpcProvider)
+        setIsSDKLoaded(true)
+        setSdkError(null)
+
+        console.log("🎉 WorldChain SDK carregado com sucesso!")
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Erro desconhecido"
+        console.error("❌ Falha ao carregar WorldChain SDK:", errorMessage)
+        setSdkError(errorMessage)
+        setIsSDKLoaded(false)
+      }
+    }
+
+    loadSDK()
+  }, [])
+
+  // Funções do contexto
+  const connect = async () => {
+    if (!isSDKLoaded || !sdk) {
+      throw new Error("SDK não carregado")
+    }
+
+    try {
+      // Conectar com MetaMask ou carteira
+      if (typeof window !== "undefined" && window.ethereum) {
+        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" })
+        const account = accounts[0]
+
+        setAddress(account)
+        setIsConnected(true)
+
+        // Atualizar balance
+        await refreshBalance()
+        await refreshTransactions()
+
+        console.log("✅ Conectado:", account)
+      } else {
+        throw new Error("MetaMask não encontrado")
+      }
+    } catch (error) {
+      console.error("❌ Erro ao conectar:", error)
+      throw error
+    }
+  }
+
+  const disconnect = () => {
+    setIsConnected(false)
+    setAddress(null)
+    setBalance(null)
+    setTokens([])
+    setTransactions([])
+    console.log("🔌 Desconectado")
+  }
+
+  const sendToken = async (to: string, amount: string, token?: string): Promise<string> => {
+    if (!isSDKLoaded || !sdk || !address) {
+      throw new Error("SDK não carregado ou não conectado")
+    }
+
+    try {
+      // Usar o Sender do SDK
+      const result = await sdk.Sender.send({
+        to,
+        amount,
+        token: token || "ETH",
+        from: address,
+      })
+
+      // Atualizar dados após envio
+      await refreshBalance()
+      await refreshTransactions()
+
+      return result.hash
+    } catch (error) {
+      console.error("❌ Erro ao enviar token:", error)
+      throw error
+    }
+  }
+
+  const swapTokens = async (fromToken: string, toToken: string, amount: string): Promise<string> => {
+    if (!isSDKLoaded || !sdk || !address) {
+      throw new Error("SDK não carregado ou não conectado")
+    }
+
+    try {
+      // Usar o SwapHelper do SDK
+      const result = await sdk.SwapHelper.swap({
+        fromToken,
+        toToken,
+        amount,
+        slippage: 0.5, // 0.5%
+        from: address,
+      })
+
+      // Atualizar dados após swap
+      await refreshBalance()
+      await refreshTransactions()
+
+      return result.hash
+    } catch (error) {
+      console.error("❌ Erro ao fazer swap:", error)
+      throw error
+    }
+  }
+
+  const getQuote = async (fromToken: string, toToken: string, amount: string) => {
+    if (!isSDKLoaded || !sdk) {
+      throw new Error("SDK não carregado")
+    }
+
+    try {
+      // Usar o SwapHelper para obter quote
+      const quote = await sdk.SwapHelper.getQuote({
+        fromToken,
+        toToken,
+        amount,
+      })
+
+      return quote
+    } catch (error) {
+      console.error("❌ Erro ao obter quote:", error)
+      throw error
+    }
+  }
+
+  const refreshBalance = async () => {
+    if (!isSDKLoaded || !sdk || !address) return
+
+    try {
+      // Obter balance usando TokenProvider
+      const balanceData = await sdk.TokenProvider.getBalance(address)
+      setBalance(balanceData.formatted)
+
+      // Obter lista de tokens
+      const tokenList = await sdk.TokenProvider.getTokens(address)
+      setTokens(tokenList)
+    } catch (error) {
+      console.error("❌ Erro ao atualizar balance:", error)
+    }
+  }
+
+  const refreshTransactions = async () => {
+    if (!isSDKLoaded || !sdk || !address) return
+
+    try {
+      // Obter histórico de transações
+      const txHistory = await sdk.Manager.getTransactions(address)
+      setTransactions(txHistory)
+    } catch (error) {
+      console.error("❌ Erro ao atualizar transações:", error)
+    }
+  }
+
+  const value: WorldChainContextType = {
+    isSDKLoaded,
+    sdkError,
+    isConnected,
+    address,
+    balance,
+    tokens,
+    transactions,
+    connect,
+    disconnect,
+    sendToken,
+    swapTokens,
+    getQuote,
+    refreshBalance,
+    refreshTransactions,
+  }
+
+  return <WorldChainContext.Provider value={value}>{children}</WorldChainContext.Provider>
 }

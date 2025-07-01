@@ -1,119 +1,103 @@
 "use client"
-
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { CheckCircle, XCircle, AlertTriangle, RefreshCw, Loader2 } from "lucide-react"
 import { useWorldChain } from "./worldchain-provider"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { AlertCircle, CheckCircle, XCircle, RefreshCw } from "lucide-react"
 
-export default function SDKTest() {
-  const { isSDKLoaded, sdkError } = useWorldChain()
-  const [isRefreshing, setIsRefreshing] = useState(false)
+export function SDKTest() {
+  const { isSDKLoaded, sdkError, isConnected, address, connect, disconnect } = useWorldChain()
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true)
-    // Recarrega a página para tentar novamente
-    setTimeout(() => {
-      window.location.reload()
-    }, 1000)
+  const getStatusIcon = (status: boolean | null) => {
+    if (status === true) return <CheckCircle className="h-4 w-4 text-green-500" />
+    if (status === false) return <XCircle className="h-4 w-4 text-red-500" />
+    return <RefreshCw className="h-4 w-4 text-yellow-500 animate-spin" />
   }
 
-  const getStatusIcon = (status: boolean) => {
-    return status ? <CheckCircle className="w-4 h-4 text-green-500" /> : <XCircle className="w-4 h-4 text-red-500" />
+  const getStatusBadge = (status: boolean | null, loadingText: string, successText: string, errorText: string) => {
+    if (status === true)
+      return (
+        <Badge variant="default" className="bg-green-500">
+          {successText}
+        </Badge>
+      )
+    if (status === false) return <Badge variant="destructive">{errorText}</Badge>
+    return <Badge variant="secondary">{loadingText}</Badge>
   }
-
-  const getStatusText = (status: boolean) => {
-    return status ? "Carregado" : "Falhou"
-  }
-
-  const getStatusColor = (status: boolean) => {
-    return status
-      ? "bg-green-500/20 text-green-400 border-green-500/30"
-      : "bg-red-500/20 text-red-400 border-red-500/30"
-  }
-
-  // Status das dependências baseado no SDK
-  const dependencies = [
-    { name: "Ethers.js", status: isSDKLoaded },
-    { name: "WorldChain SDK", status: isSDKLoaded },
-    { name: "Holdstation Client", status: isSDKLoaded },
-    { name: "Multicall3", status: isSDKLoaded },
-    { name: "TokenProvider", status: isSDKLoaded },
-  ]
 
   return (
-    <Card className="bg-gray-900/70 border-2 border-purple-500/30 backdrop-blur-sm">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg text-purple-400">Status do SDK</CardTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="text-purple-400 hover:bg-purple-500/20"
-          >
-            {isRefreshing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-            {isRefreshing ? "Recarregando..." : "Tentar Novamente"}
-          </Button>
-        </div>
+    <Card className="w-full max-w-2xl mx-auto">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <AlertCircle className="h-5 w-5" />
+          Status do Sistema TPulseFi
+        </CardTitle>
       </CardHeader>
-
       <CardContent className="space-y-4">
-        {/* Error Alert */}
-        {sdkError && (
-          <Alert className="border-red-500/30 bg-red-500/10">
-            <AlertTriangle className="h-4 w-4 text-red-500" />
-            <AlertDescription className="text-red-400">
-              <strong>Erro ao carregar SDK:</strong> {sdkError}
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Dependencies Status */}
-        <div className="space-y-2">
-          <h4 className="text-sm font-medium text-gray-300">Dependências</h4>
-          {dependencies.map((dep) => (
-            <div key={dep.name} className="flex items-center justify-between p-2 bg-gray-800/40 rounded">
-              <span className="text-sm text-gray-300">{dep.name}</span>
-              <div className="flex items-center gap-2">
-                {getStatusIcon(dep.status)}
-                <Badge variant="secondary" className={`text-xs ${getStatusColor(dep.status)}`}>
-                  {getStatusText(dep.status)}
-                </Badge>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Overall Status */}
-        <div className="flex items-center justify-between p-3 bg-gray-800/60 rounded-lg border">
-          <span className="font-medium text-gray-200">Status Geral</span>
+        {/* Status do SDK */}
+        <div className="flex items-center justify-between p-3 border rounded-lg">
           <div className="flex items-center gap-2">
             {getStatusIcon(isSDKLoaded)}
-            <Badge
-              variant={isSDKLoaded ? "default" : "destructive"}
-              className={isSDKLoaded ? "bg-green-500/20 text-green-400 border-green-500/30" : ""}
-            >
-              {isSDKLoaded ? "Operacional" : "Indisponível"}
-            </Badge>
+            <span className="font-medium">WorldChain SDK</span>
           </div>
+          {getStatusBadge(isSDKLoaded, "Carregando...", "Carregado", "Falhou")}
         </div>
 
-        {/* Instructions */}
+        {/* Erro do SDK */}
+        {sdkError && (
+          <div className="p-3 border border-red-200 rounded-lg bg-red-50">
+            <div className="flex items-center gap-2 text-red-700">
+              <XCircle className="h-4 w-4" />
+              <span className="font-medium">Erro do SDK:</span>
+            </div>
+            <p className="text-sm text-red-600 mt-1">{sdkError}</p>
+          </div>
+        )}
+
+        {/* Status da Conexão */}
+        <div className="flex items-center justify-between p-3 border rounded-lg">
+          <div className="flex items-center gap-2">
+            {getStatusIcon(isConnected)}
+            <span className="font-medium">Conexão da Carteira</span>
+          </div>
+          {getStatusBadge(isConnected, "Desconectado", "Conectado", "Desconectado")}
+        </div>
+
+        {/* Endereço da Carteira */}
+        {address && (
+          <div className="p-3 border rounded-lg bg-green-50">
+            <div className="flex items-center gap-2 text-green-700">
+              <CheckCircle className="h-4 w-4" />
+              <span className="font-medium">Endereço:</span>
+            </div>
+            <p className="text-sm text-green-600 mt-1 font-mono">{address}</p>
+          </div>
+        )}
+
+        {/* Ações */}
+        <div className="flex gap-2 pt-4">
+          {!isConnected ? (
+            <Button onClick={connect} disabled={!isSDKLoaded} className="flex-1">
+              {isSDKLoaded ? "Conectar Carteira" : "SDK não disponível"}
+            </Button>
+          ) : (
+            <Button onClick={disconnect} variant="outline" className="flex-1 bg-transparent">
+              Desconectar
+            </Button>
+          )}
+        </div>
+
+        {/* Instruções */}
         {!isSDKLoaded && (
-          <Alert className="border-yellow-500/30 bg-yellow-500/10">
-            <AlertTriangle className="h-4 w-4 text-yellow-500" />
-            <AlertDescription className="text-yellow-400">
-              <strong>SDK não disponível:</strong> Para usar funcionalidades reais, instale as dependências:
-              <br />
-              <code className="text-xs bg-gray-800 px-1 py-0.5 rounded mt-1 block">
-                npm install @holdstation/worldchain-sdk @holdstation/worldchain-ethers-v6 ethers
-              </code>
-            </AlertDescription>
-          </Alert>
+          <div className="p-3 border border-yellow-200 rounded-lg bg-yellow-50">
+            <div className="flex items-center gap-2 text-yellow-700">
+              <AlertCircle className="h-4 w-4" />
+              <span className="font-medium">Dependências não encontradas</span>
+            </div>
+            <p className="text-sm text-yellow-600 mt-1">
+              Execute: <code className="bg-yellow-100 px-1 rounded">npm run manual-install</code>
+            </p>
+          </div>
         )}
       </CardContent>
     </Card>
