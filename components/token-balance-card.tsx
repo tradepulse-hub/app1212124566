@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { RefreshCw, Wallet, ExternalLink, TrendingUp, Zap } from "lucide-react"
-import { ethers } from "ethers"
+import { formatUnits } from "ethers"
 
 interface TokenBalanceCardProps {
   tokenBalances: Record<string, string>
@@ -64,7 +64,7 @@ export default function TokenBalanceCard({ tokenBalances, isLoading, onRefresh }
     if (!balance || balance === "0") return "0.00"
 
     try {
-      const formatted = ethers.utils.formatUnits(balance, decimals)
+      const formatted = formatUnits(balance, decimals)
       const num = Number.parseFloat(formatted)
 
       if (num < 0.0001) return "< 0.0001"
@@ -85,7 +85,7 @@ export default function TokenBalanceCard({ tokenBalances, isLoading, onRefresh }
     if (!balance || balance === "0") return 0
 
     try {
-      const formatted = ethers.utils.formatUnits(balance, decimals)
+      const formatted = formatUnits(balance, decimals)
       const num = Number.parseFloat(formatted)
       return num * price
     } catch (error) {
